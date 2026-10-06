@@ -13,6 +13,7 @@ EXTENSIONS = (
     "kqbot.cogs.schedule_commands",
     "kqbot.cogs.setup_commands",
     "kqbot.cogs.reaction_roles",
+    "kqbot.cogs.reminders",
 )
 
 

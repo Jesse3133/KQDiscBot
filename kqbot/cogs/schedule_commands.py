@@ -4,6 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from kqbot.cogs.common import event_choices
 from kqbot.formatting import next_line
 from kqbot.schedule import current_occurrence, next_occurrence
 
@@ -38,12 +39,7 @@ class ScheduleCommands(commands.Cog):
     async def event_autocomplete(
         self, interaction: discord.Interaction, current: str
     ) -> list[app_commands.Choice[str]]:
-        current = current.lower()
-        return [
-            app_commands.Choice(name=e.name, value=e.key)
-            for e in self.bot.events
-            if current in e.name.lower()
-        ][:25]
+        return event_choices(self.bot.events, current)
 
 
 async def setup(bot) -> None:

@@ -24,7 +24,7 @@ every player the times in their own time zone.
 | 1 | Schedule math + tests | ✅ |
 | 2 | Bot connects, `/next` command | ✅ |
 | 3 | Auto-setup: roles, channels, reaction-role message | ✅ |
-| 4 | Reminders 3 min before, role pings, ✅/❌, auto-delete | planned |
+| 4 | Reminders 3 min before, role pings, ✅/❌, auto-delete | ✅ |
 | 5 | Admin commands: `/event`, `/shift`, `/config`, `/setup` | planned |
 | 6 | Hosting + auto-deploy | planned |
 
@@ -36,10 +36,30 @@ every player the times in their own time zone.
 | `/next event:<name>` | Everyone | Same, for one event. |
 
 | `/setup` | Admins (Manage Server) | Create anything that's missing: roles, channels, the role picker message. Safe to run any time. |
+| `/test-reminder` | Admins (Manage Server) | Post a test reminder for every event (or one with `event:`) that really pings the roles, and list anything that would stop pings working. Test messages delete themselves after 5 minutes. |
 
-Replies are only visible to the person who ran the command. `/setup` is
+Replies are only visible to the person who ran the command. Admin commands are
 hidden from members without **Manage Server**. You can change who sees it
 under Server Settings → Integrations → Fiesta KQ Bot.
+
+## Reminders
+
+3 minutes before each Kingdom Quest, the bot posts in `#kq-alerts`:
+
+> @Mean Giant Honeying 🍯 **Mean Giant Honeying** is starting soon!
+> Starts 9:03 AM (in 3 minutes) · Recruitment closes 9:33 AM
+
+- It pings only that event's role. People choose roles in `#kq-roles`.
+- ✅ and ❌ are added so people can say whether they're coming.
+- The message is deleted when recruitment closes, 30 minutes after the start.
+- Every event gets its own message, even when two start a minute apart.
+- If the bot was offline and comes back within the 3 minutes, it still posts.
+  If the event has already started, it skips that reminder. Reminders that
+  should have been deleted while it was offline are deleted on startup.
+
+**Pings not arriving?** Run `/test-reminder`. It posts real test pings and
+lists problems such as missing permissions or a role that isn't mentionable.
+You only get notified for roles you have, so react in `#kq-roles` first.
 
 ## What the bot sets up in your server
 
@@ -133,12 +153,15 @@ kqbot/
   db.py            SQLite storage (events, roles, channels)
   events.py        the 5 Kingdom Quests and their default timing
   guild_setup.py   creates/repairs roles, channels, role picker message
+  reminders.py     which reminders are due (timing only)
   schedule.py      "when does it start next?" math, incl. daylight saving
   formatting.py    message text
   cogs/
     schedule_commands.py   /next
     setup_commands.py      /setup, auto-setup on join and first start
     reaction_roles.py      gives/removes roles on role picker reactions
+    reminders.py           reminder loop, cleanup, /test-reminder
+    common.py              shared helpers for commands
 tests/             unit tests (Discord is faked, no token needed)
 docs/              setup guides
 ```

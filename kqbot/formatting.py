@@ -39,3 +39,16 @@ def roles_message(events: tuple[Event, ...], role_ids: dict[str, int]) -> str:
         role = f" → <@&{role_id}>" if role_id else ""
         lines.append(f"{event.emoji} {event.name}{role}")
     return "\n".join(lines)
+
+
+def reminder_message(occ: Occurrence, role_id: int | None, test: bool = False) -> str:
+    event = occ.event
+    mention = f"<@&{role_id}> " if role_id else ""
+    lines = [
+        f"{mention}{event.emoji} **{event.name}** is starting soon!",
+        f"Starts {ts(occ.start, 't')} ({ts(occ.start, 'R')}) · "
+        f"Recruitment closes {ts(occ.end, 't')}",
+    ]
+    if test:
+        lines.insert(0, "🧪 **Test reminder**: not a real event, just checking pings.")
+    return "\n".join(lines)

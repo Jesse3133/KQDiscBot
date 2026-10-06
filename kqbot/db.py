@@ -37,7 +37,29 @@ MIGRATIONS = (
         PRIMARY KEY (guild_id, event_key)
     );
     """,
+    """
+    -- One row per reminder already posted, so it's never posted twice.
+    CREATE TABLE sent_reminders (
+        guild_id INTEGER NOT NULL,
+        event_key TEXT NOT NULL,
+        start_ts INTEGER NOT NULL,
+        PRIMARY KEY (guild_id, event_key, start_ts)
+    );
+    -- Bot messages to delete later (reminders when recruitment closes).
+    CREATE TABLE pending_deletes (
+        message_id INTEGER PRIMARY KEY,
+        channel_id INTEGER NOT NULL,
+        delete_at INTEGER NOT NULL
+    );
+    """,
 )
+
+
+@dataclass(frozen=True)
+class PendingDelete:
+    message_id: int
+    channel_id: int
+    delete_at: int  # unix seconds
 
 
 @dataclass
@@ -97,6 +119,9 @@ class Database:
 
     # Guilds
 
+    def list_guilds(self) -> list[GuildSettings]:
+        return [GuildSettings(**dict(row)) for row in self.conn.execute("SELECT * FROM guilds")]
+
     def get_guild(self, guild_id: int) -> GuildSettings | None:
         row = self.conn.execute("SELECT * FROM guilds WHERE guild_id = ?", (guild_id,)).fetchone()
         return GuildSettings(**dict(row)) if row else None
@@ -132,3 +157,44 @@ class Database:
                 "INSERT OR REPLACE INTO event_roles VALUES (?, ?, ?)",
                 (guild_id, event_key, role_id),
             )
+
+    # Reminders
+
+    def reminder_sent(self, guild_id: int, event_key: str, start_ts: int) -> bool:
+        row = self.conn.execute(
+            "SELECT 1 FROM sent_reminders WHERE guild_id = ? AND event_key = ? AND start_ts = ?",
+            (guild_id, event_key, start_ts),
+        ).fetchone()
+        return row is not None
+
+    def mark_reminder_sent(self, guild_id: int, event_key: str, start_ts: int) -> None:
+        with self.conn:
+            self.conn.execute(
+                "INSERT OR IGNORE INTO sent_reminders VALUES (?, ?, ?)",
+                (guild_id, event_key, start_ts),
+            )
+
+    def prune_sent_reminders(self, before_ts: int) -> None:
+        with self.conn:
+            self.conn.execute("DELETE FROM sent_reminders WHERE start_ts < ?", (before_ts,))
+
+    # Scheduled message deletion
+
+    def schedule_delete(self, item: PendingDelete) -> None:
+        with self.conn:
+            self.conn.execute(
+                "INSERT OR REPLACE INTO pending_deletes VALUES (?, ?, ?)",
+                (item.message_id, item.channel_id, item.delete_at),
+            )
+
+    def due_deletes(self, now_ts: int) -> list[PendingDelete]:
+        rows = self.conn.execute(
+            "SELECT message_id, channel_id, delete_at FROM pending_deletes"
+            " WHERE delete_at <= ? ORDER BY delete_at",
+            (now_ts,),
+        )
+        return [PendingDelete(**dict(row)) for row in rows]
+
+    def remove_pending_delete(self, message_id: int) -> None:
+        with self.conn:
+            self.conn.execute("DELETE FROM pending_deletes WHERE message_id = ?", (message_id,))

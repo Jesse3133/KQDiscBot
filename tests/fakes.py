@@ -28,6 +28,7 @@ class FakeMessage:
     id: int = field(default_factory=lambda: next(_ids))
     reactions: list = field(default_factory=list)
     edits: int = 0
+    allowed_mentions: object = None
 
     async def edit(self, content, allowed_mentions=None):
         self.content = content
@@ -45,7 +46,7 @@ class FakeChannel:
     messages: dict = field(default_factory=dict)
 
     async def send(self, content, allowed_mentions=None):
-        message = FakeMessage(content)
+        message = FakeMessage(content, allowed_mentions=allowed_mentions)
         self.messages[message.id] = message
         return message
 
@@ -66,6 +67,9 @@ class FakeGuild:
 
     def get_role(self, role_id):
         return next((r for r in self.roles if r.id == role_id), None)
+
+    def get_channel(self, channel_id):
+        return next((c for c in self.text_channels if c.id == channel_id), None)
 
     async def create_role(self, name, mentionable, reason):
         role = FakeRole(name, mentionable)
