@@ -61,3 +61,44 @@ def test_delete_guild(db):
     assert db.get_guild(1) is None
     assert db.get_event_roles(1) == {}
     assert db.get_event_roles(2) == {"honeying": 200}
+
+
+def test_events_sorted_by_lowest_level(db):
+    from kqbot.events import Event
+
+    db.seed_events(DEFAULT_EVENTS)
+    db.add_event(Event("none", "No Levels", 5, "⭐"))
+    db.add_event(Event("low", "Low", 5, "🌱", min_level=1, max_level=10))
+    db.update_event(replace(DEFAULT_EVENTS[0], min_level=50, max_level=55))  # pirates
+    keys = [e.key for e in db.load_events()]
+    assert keys == ["low", "robo", "brigade", "honeying", "dragon", "pirates", "none"]
+
+
+def test_migration_adds_levels_to_existing_events(tmp_path):
+    """A database from before levels existed gets the five brackets filled in."""
+    import sqlite3
+
+    from kqbot.db import MIGRATIONS
+
+    path = tmp_path / "old.sqlite3"
+    conn = sqlite3.connect(path)
+    for number, script in enumerate(MIGRATIONS[:3], start=1):
+        conn.executescript(script)
+        conn.execute(f"PRAGMA user_version = {number}")
+    # Events as phase 5 stored them: time order, no level columns.
+    conn.executemany(
+        "INSERT INTO events VALUES (?, ?, ?, ?, 2, 1, 30, ?)",
+        [
+            ("brigade", "Midnight Brigade Veteran", 0, "🌙", 0),
+            ("robo", "The Millennium Robo Plot", 1, "🤖", 1),
+            ("honeying", "Mean Giant Honeying", 3, "🍯", 2),
+            ("dragon", "Mini Dragon HC", 9, "🐉", 3),
+            ("pirates", "Mara Pirates' Rage", 12, "🏴‍☠️", 4),
+        ],
+    )
+    conn.commit()
+    conn.close()
+
+    db = Database(path)
+    assert db.load_events() == DEFAULT_EVENTS
+    db.close()

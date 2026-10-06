@@ -66,7 +66,35 @@ MIGRATIONS = (
         PRIMARY KEY (event_key, base_start_ts)
     );
     """,
+    """
+    ALTER TABLE events ADD COLUMN min_level INTEGER;
+    ALTER TABLE events ADD COLUMN max_level INTEGER;
+    -- Level brackets for the original five Kingdom Quests.
+    UPDATE events SET min_level = 17, max_level = 25 WHERE key = 'pirates';
+    UPDATE events SET min_level = 33, max_level = 45 WHERE key = 'robo';
+    UPDATE events SET min_level = 36, max_level = 65 WHERE key = 'brigade';
+    UPDATE events SET min_level = 40, max_level = 50 WHERE key = 'honeying';
+    UPDATE events SET min_level = 46, max_level = 60 WHERE key = 'dragon';
+    """,
 )
+
+EVENT_COLUMNS = (
+    "key, name, minute, emoji, interval_hours, first_hour, duration_minutes, min_level, max_level"
+)
+
+
+def _event_values(event: Event) -> tuple:
+    return (
+        event.key,
+        event.name,
+        event.minute,
+        event.emoji,
+        event.interval_hours,
+        event.first_hour,
+        event.duration_minutes,
+        event.min_level,
+        event.max_level,
+    )
 
 
 @dataclass(frozen=True)
@@ -108,52 +136,27 @@ class Database:
             return
         with self.conn:
             self.conn.executemany(
-                "INSERT INTO events VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                [
-                    (
-                        e.key,
-                        e.name,
-                        e.minute,
-                        e.emoji,
-                        e.interval_hours,
-                        e.first_hour,
-                        e.duration_minutes,
-                        position,
-                    )
-                    for position, e in enumerate(events)
-                ],
+                f"INSERT INTO events ({EVENT_COLUMNS}, position)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [(*_event_values(e), position) for position, e in enumerate(events)],
             )
 
     def add_event(self, event: Event) -> None:
         with self.conn:
             self.conn.execute(
-                "INSERT INTO events VALUES"
-                " (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position) + 1, 0) FROM events))",
-                (
-                    event.key,
-                    event.name,
-                    event.minute,
-                    event.emoji,
-                    event.interval_hours,
-                    event.first_hour,
-                    event.duration_minutes,
-                ),
+                f"INSERT INTO events ({EVENT_COLUMNS}, position) VALUES"
+                " (?, ?, ?, ?, ?, ?, ?, ?, ?,"
+                " (SELECT COALESCE(MAX(position) + 1, 0) FROM events))",
+                _event_values(event),
             )
 
     def update_event(self, event: Event) -> None:
         with self.conn:
             self.conn.execute(
                 "UPDATE events SET name = ?, minute = ?, emoji = ?, interval_hours = ?,"
-                " first_hour = ?, duration_minutes = ? WHERE key = ?",
-                (
-                    event.name,
-                    event.minute,
-                    event.emoji,
-                    event.interval_hours,
-                    event.first_hour,
-                    event.duration_minutes,
-                    event.key,
-                ),
+                " first_hour = ?, duration_minutes = ?, min_level = ?, max_level = ?"
+                " WHERE key = ?",
+                (*_event_values(event)[1:], event.key),
             )
 
     def delete_event(self, key: str) -> None:
@@ -163,9 +166,9 @@ class Database:
             self.conn.execute("DELETE FROM shifts WHERE event_key = ?", (key,))
 
     def load_events(self) -> tuple[Event, ...]:
+        # Lowest joinable level first; events without levels last, in the order added.
         rows = self.conn.execute(
-            "SELECT key, name, minute, emoji, interval_hours, first_hour, duration_minutes"
-            " FROM events ORDER BY position"
+            f"SELECT {EVENT_COLUMNS} FROM events ORDER BY min_level IS NULL, min_level, position"
         )
         return tuple(Event(**dict(row)) for row in rows)
 

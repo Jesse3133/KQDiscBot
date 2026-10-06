@@ -108,7 +108,16 @@ def test_make_key():
 
 
 @pytest.mark.parametrize(
-    "kwargs", [{"name": ""}, {"name": "x" * 81}, {"emoji": "x"}, {"duration_minutes": 2000}]
+    "kwargs",
+    [
+        {"name": ""},
+        {"name": "x" * 81},
+        {"emoji": "x"},
+        {"duration_minutes": 2000},
+        {"min_level": 10},  # max missing
+        {"min_level": 30, "max_level": 20},
+        {"min_level": 0, "max_level": 20},
+    ],
 )
 def test_event_validation(kwargs):
     with pytest.raises(ValueError):

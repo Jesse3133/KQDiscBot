@@ -3,13 +3,13 @@
 A Discord bot that tracks **Kingdom Quest** start times for Fiesta Online (NA)
 and tells your server when they're about to begin.
 
-| Event | Starts (Pacific time, odd hours) | Recruitment |
-|---|---|---|
-| 🌙 Midnight Brigade Veteran | xx:00 | 30 min |
-| 🤖 The Millennium Robo Plot | xx:01 | 30 min |
-| 🍯 Mean Giant Honeying | xx:03 | 30 min |
-| 🐉 Mini Dragon HC | xx:09 | 30 min |
-| 🏴‍☠️ Mara Pirates' Rage | xx:12 | 30 min |
+| Event | Levels | Starts (Pacific time, odd hours) | Recruitment |
+|---|---|---|---|
+| 🏴‍☠️ Mara Pirates' Rage | 17-25 | xx:12 | 30 min |
+| 🤖 The Millennium Robo Plot | 33-45 | xx:01 | 30 min |
+| 🌙 Midnight Brigade Veteran | 36-65 | xx:00 | 30 min |
+| 🍯 Mean Giant Honeying | 40-50 | xx:03 | 30 min |
+| 🐉 Mini Dragon HC | 46-60 | xx:09 | 30 min |
 
 "Odd hours" means 1:00, 3:00, 5:00 … 23:00 on a US Pacific clock. The game
 follows daylight saving, so in UTC the events are on even hours in summer and
@@ -42,8 +42,8 @@ every player the times in their own time zone.
 | Command | What it does |
 |---|---|
 | `/event list` | Every event with its timing and recruitment length. |
-| `/event add` | Add an event: name, minute, emoji, and optionally interval, first hour and recruitment length. Creates its role and adds it to the role picker. |
-| `/event edit` | Change any of those for an existing event. Only the options you fill in change. Renaming also renames its role; people keep it. |
+| `/event add` | Add an event: name, minute, emoji, and optionally interval, first hour, recruitment length and level range (`min_level` + `max_level`). Creates its role and adds it to the role picker. |
+| `/event edit` | Change any of those for an existing event. Only the options you fill in change. Renaming also renames its role; people keep it. Set both levels to `0` to remove the range. |
 | `/event remove` | Remove an event. Asks for confirmation, then deletes its role (taking it from everyone) and its picker emoji. |
 | `/shift` | Move only the **next** start of one event, or all events, by up to ±180 minutes (e.g. for maintenance). `minutes:0` puts it back. Reminders and `/next` follow the new time. |
 | `/config show` | Current settings. |
@@ -85,6 +85,15 @@ without using up server emoji slots, upload them as **application emojis**:
 
 When you change an event's emoji, people keep the role they have.
 
+### Role picker order
+
+Events are listed by the lowest level that can join. Events without a level
+range go last. Discord can't reorder the emojis under a message, so when the
+order changes (a new event lands in the middle, levels change, or an emoji
+changes) the bot posts a fresh picker and deletes the old one. Everyone keeps
+their roles, but their old reactions go with the old message. To drop a role
+afterwards, react on the new message and then remove the reaction.
+
 ## Reminders
 
 3 minutes before each Kingdom Quest, the bot posts in `#kq-alerts`:
@@ -116,7 +125,7 @@ start in a server it's already in. Run `/setup` to repeat it any time.
 | 5 roles | One per event, named after it (e.g. `@Mean Giant Honeying`). Set to mentionable so reminders can ping them. |
 | `#kq-alerts` | Where reminders will be posted. |
 | `#kq-roles` | Holds the role picker message. |
-| Role picker message | Lists each event with its emoji. React to get that event's role, remove your reaction to lose it. |
+| Role picker message | Lists each event with its emoji and level range, lowest level first. React to get that event's role, remove your reaction to lose it. |
 
 Both channels are read-only for members: they can read and click existing
 reactions, but can't post or add new emojis. Admins can still post.

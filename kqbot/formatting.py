@@ -41,8 +41,9 @@ def roles_message(events: tuple[Event, ...], role_ids: dict[str, int]) -> str:
     ]
     for event in events:
         role_id = role_ids.get(event.key)
+        levels = f" ({event.levels})" if event.levels else ""
         role = f" → <@&{role_id}>" if role_id else ""
-        lines.append(f"{event.emoji} {event.name}{role}")
+        lines.append(f"{event.emoji} {event.name}{levels}{role}")
     return "\n".join(lines)
 
 
@@ -73,7 +74,8 @@ def describe_timing(event: Event) -> str:
 
 
 def describe_event(event: Event) -> str:
+    levels = f" ({event.levels})" if event.levels else ""
     return (
-        f"{event.emoji} **{event.name}**: {describe_timing(event)}, "
+        f"{event.emoji} **{event.name}**{levels}: {describe_timing(event)}, "
         f"recruitment {event.duration_minutes} min"
     )

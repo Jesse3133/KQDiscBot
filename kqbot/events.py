@@ -13,6 +13,7 @@ VALID_INTERVALS = (1, 2, 3, 4, 6, 8, 12, 24)
 # Discord allows at most 20 different reactions on one message (the role picker).
 MAX_EVENTS = 20
 MAX_NAME_LENGTH = 80
+MAX_LEVEL = 999
 
 # Custom emoji markup, e.g. <:honey:1234567890> or <a:spin:1234567890> (animated).
 CUSTOM_EMOJI = re.compile(r"<a?:(\w{2,32}):(\d{15,25})>")
@@ -27,6 +28,9 @@ class Event:
     interval_hours: int = 2
     first_hour: int = 1
     duration_minutes: int = 30
+    # Level range allowed to join, shown on the role picker. Both or neither.
+    min_level: int | None = None
+    max_level: int | None = None
 
     def __post_init__(self) -> None:
         if self.interval_hours not in VALID_INTERVALS:
@@ -41,6 +45,15 @@ class Event:
             raise ValueError(f"name must be 1 to {MAX_NAME_LENGTH} characters")
         if not is_emoji(self.emoji):
             raise ValueError("emoji must be a single emoji or a custom emoji like <:name:id>")
+        if (self.min_level is None) != (self.max_level is None):
+            raise ValueError("set both the minimum and maximum level, or neither")
+        if self.min_level is not None and not (1 <= self.min_level <= self.max_level <= MAX_LEVEL):
+            raise ValueError(f"levels must be 1 to {MAX_LEVEL}, minimum no higher than maximum")
+
+    @property
+    def levels(self) -> str:
+        """E.g. "Lv 17-25", or "" when no range is set."""
+        return f"Lv {self.min_level}-{self.max_level}" if self.min_level is not None else ""
 
     def runs_at_hour(self, hour: int) -> bool:
         return (hour - self.first_hour) % self.interval_hours == 0
@@ -87,10 +100,29 @@ def find_event_by_emoji(events: tuple[Event, ...], emoji: str) -> Event | None:
 
 # Seed data: written to the database on first start. After that the database
 # is the source of truth, edited with the /event commands.
+# Ordered by the lowest level that can join, like the role picker.
 DEFAULT_EVENTS: tuple[Event, ...] = (
-    Event(key="brigade", name="Midnight Brigade Veteran", minute=0, emoji="🌙"),
-    Event(key="robo", name="The Millennium Robo Plot", minute=1, emoji="🤖"),
-    Event(key="honeying", name="Mean Giant Honeying", minute=3, emoji="🍯"),
-    Event(key="dragon", name="Mini Dragon HC", minute=9, emoji="🐉"),
-    Event(key="pirates", name="Mara Pirates' Rage", minute=12, emoji="🏴‍☠️"),
+    Event(
+        key="pirates", name="Mara Pirates' Rage", minute=12, emoji="🏴‍☠️", min_level=17, max_level=25
+    ),
+    Event(
+        key="robo",
+        name="The Millennium Robo Plot",
+        minute=1,
+        emoji="🤖",
+        min_level=33,
+        max_level=45,
+    ),
+    Event(
+        key="brigade",
+        name="Midnight Brigade Veteran",
+        minute=0,
+        emoji="🌙",
+        min_level=36,
+        max_level=65,
+    ),
+    Event(
+        key="honeying", name="Mean Giant Honeying", minute=3, emoji="🍯", min_level=40, max_level=50
+    ),
+    Event(key="dragon", name="Mini Dragon HC", minute=9, emoji="🐉", min_level=46, max_level=60),
 )

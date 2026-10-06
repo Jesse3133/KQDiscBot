@@ -141,15 +141,16 @@ def test_remove_cancelled(env, monkeypatch):
 
 def test_shift_and_undo(env):
     now = datetime.now(UTC)
-    normal = env.bot.schedule.next(env.bot.events[2], now)
+    honeying = next(e for e in env.bot.events if e.key == "honeying")
+    normal = env.bot.schedule.next(honeying, now)
     text = call(env.cog.shift, env, interaction(env.guild), "honeying", 20)
     assert "now starts" in text
-    moved = env.bot.schedule.next(env.bot.events[2], now)
+    moved = env.bot.schedule.next(honeying, now)
     assert moved.start == normal.start + timedelta(minutes=20)
 
     text = call(env.cog.shift, env, interaction(env.guild), "honeying", 0)
     assert "back to normal" in text
-    assert env.bot.schedule.next(env.bot.events[2], now).start == normal.start
+    assert env.bot.schedule.next(honeying, now).start == normal.start
 
 
 def test_shift_all(env):
@@ -196,3 +197,25 @@ def test_config_show(env):
 def test_event_list(env):
     text = call(env.cog.event_list, env, interaction(env.guild))
     assert text.count("every 2 hours") == 5
+
+
+def test_add_with_levels_goes_in_level_order(env):
+    text = call(
+        env.cog.event_add, env, interaction(env.guild), "Starter", 7, "🌱", None, 1, 30, 5, 15
+    )
+    assert "(Lv 5-15)" in text
+    assert env.bot.events[0].key == "starter"
+    first_line = picker(env).content.splitlines()[3]
+    assert first_line.startswith("🌱 Starter (Lv 5-15)")
+
+
+def test_edit_levels_reorders_and_clears(env):
+    def edit(**kwargs):
+        return call(env.cog.event_edit, env, interaction(env.guild), "pirates", **kwargs)
+
+    assert "(Lv 70-80)" in edit(min_level=70, max_level=80)
+    assert [e.key for e in env.bot.events][-1] == "pirates"
+    assert "Updated" in edit(min_level=0, max_level=0)
+    pirates = next(e for e in env.bot.events if e.key == "pirates")
+    assert pirates.levels == ""
+    assert "set both" in edit(min_level=20)

@@ -78,6 +78,20 @@ async def _ensure_channel(
     return channel
 
 
+def _reaction_order_after_sync(message: discord.Message, wanted: list[str]) -> list[str]:
+    """Order the bot's reactions would end up in if we only removed and added.
+
+    Discord shows reactions in the order they were first added and can't
+    reorder them, so new ones always land at the end.
+    """
+    kept = [
+        emoji
+        for emoji in (normalize_emoji(str(r.emoji)) for r in message.reactions if r.me)
+        if emoji in wanted
+    ]
+    return kept + [emoji for emoji in wanted if emoji not in kept]
+
+
 async def _ensure_roles_message(
     channel: discord.TextChannel,
     stored_id: int | None,
@@ -88,6 +102,7 @@ async def _ensure_roles_message(
     content = roles_message(events, role_ids)
     # Show role mentions without pinging everyone who has them.
     no_pings = discord.AllowedMentions.none()
+    wanted = [normalize_emoji(e.emoji) for e in events]
 
     message = None
     if stored_id:
@@ -96,13 +111,21 @@ async def _ensure_roles_message(
         except discord.NotFound:
             message = None
 
-    if message is None:
+    if message is not None and _reaction_order_after_sync(message, wanted) != wanted:
+        # The event order changed. Repost so the emojis match the list.
+        # People keep their roles; only the reactions on the old message go.
+        try:
+            await message.delete()
+        except discord.NotFound:
+            pass
+        message = await channel.send(content, allowed_mentions=no_pings)
+        report.created.append(f"reposted role picker in #{channel.name} (new order)")
+    elif message is None:
         message = await channel.send(content, allowed_mentions=no_pings)
         report.created.append(f"role picker message in #{channel.name}")
     elif message.content != content:
         await message.edit(content=content, allowed_mentions=no_pings)
 
-    wanted = {normalize_emoji(e.emoji) for e in events}
     present = set()
     for reaction in message.reactions:
         if not reaction.me:
@@ -111,7 +134,7 @@ async def _ensure_roles_message(
         if emoji in wanted:
             present.add(emoji)
         else:
-            # Event removed or its emoji changed.
+            # Event removed.
             await message.remove_reaction(reaction.emoji, channel.guild.me)
     for event in events:
         if normalize_emoji(event.emoji) not in present:

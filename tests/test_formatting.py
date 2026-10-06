@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from kqbot.events import DEFAULT_EVENTS
+from kqbot.events import DEFAULT_EVENTS, Event
 from kqbot.formatting import next_line, roles_message, ts
 from kqbot.schedule import Occurrence
 
@@ -29,6 +29,11 @@ def test_active_line():
 
 def test_roles_message_lists_every_event():
     text = roles_message(DEFAULT_EVENTS, {"honeying": 42})
-    assert "🍯 Mean Giant Honeying → <@&42>" in text
-    assert "🐉 Mini Dragon HC\n" in text or text.endswith("🐉 Mini Dragon HC")
+    assert "🍯 Mean Giant Honeying (Lv 40-50) → <@&42>" in text
+    assert text.endswith("🐉 Mini Dragon HC (Lv 46-60)")
     assert text.count("\n") >= len(DEFAULT_EVENTS)
+
+
+def test_roles_message_without_levels():
+    plain = (Event("a", "Plain", 0, "⭐"),)
+    assert roles_message(plain, {}).endswith("⭐ Plain")

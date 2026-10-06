@@ -32,6 +32,7 @@ class FakeMessage:
     reactions: list = field(default_factory=list)
     edits: int = 0
     allowed_mentions: object = None
+    deleted: bool = False
 
     async def edit(self, content, allowed_mentions=None):
         self.content = content
@@ -39,6 +40,9 @@ class FakeMessage:
 
     async def add_reaction(self, emoji):
         self.reactions.append(FakeReaction(str(emoji)))
+
+    async def delete(self):
+        self.deleted = True
 
     async def remove_reaction(self, emoji, member):
         self.reactions = [r for r in self.reactions if r.emoji != emoji]
@@ -58,7 +62,7 @@ class FakeChannel:
         return message
 
     async def fetch_message(self, message_id):
-        if message_id not in self.messages:
+        if message_id not in self.messages or self.messages[message_id].deleted:
             raise discord.NotFound(MagicMock(status=404, reason="Not Found"), "Unknown Message")
         return self.messages[message_id]
 

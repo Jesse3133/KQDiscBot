@@ -40,7 +40,8 @@ def test_fresh_server(db):
     message = roles_message(guild, db)
     assert [r.emoji for r in message.reactions] == [e.emoji for e in DEFAULT_EVENTS]
     for event in DEFAULT_EVENTS:
-        assert f"{event.emoji} {event.name} → <@&{roles[event.key]}>" in message.content
+        line = f"{event.emoji} {event.name} ({event.levels}) → <@&{roles[event.key]}>"
+        assert line in message.content
 
 
 def test_new_channels_are_read_only_for_members(db):
@@ -129,13 +130,13 @@ def test_renamed_event_renames_role(db):
     assert len(guild.roles) == 5
 
 
-def test_changed_emoji_swaps_reaction(db):
+def test_changed_emoji_swaps_reaction_in_place(db):
     guild = FakeGuild()
     run(guild, db)
     changed = tuple(replace(e, emoji="🐝") if e.key == "honeying" else e for e in DEFAULT_EVENTS)
     run(guild, db, events=changed)
-    emojis = [r.emoji for r in roles_message(guild, db).reactions]
-    assert "🍯" not in emojis and "🐝" in emojis and len(emojis) == 5
+    # A new emoji can only go at the end, so the picker is reposted in order.
+    assert [r.emoji for r in roles_message(guild, db).reactions] == [e.emoji for e in changed]
 
 
 def test_removed_event_drops_reaction(db):
@@ -156,3 +157,50 @@ def test_custom_emoji_reaction(db):
     # Running again doesn't add it twice.
     run(guild, db, events=(custom,))
     assert len(roles_message(guild, db).reactions) == 1
+
+
+def test_picker_lists_events_by_lowest_level(db):
+    guild = FakeGuild()
+    run(guild, db)
+    lines = roles_message(guild, db).content.splitlines()[3:]
+    assert [line.split(" (Lv")[0] for line in lines] == [
+        "🏴‍☠️ Mara Pirates' Rage",
+        "🤖 The Millennium Robo Plot",
+        "🌙 Midnight Brigade Veteran",
+        "🍯 Mean Giant Honeying",
+        "🐉 Mini Dragon HC",
+    ]
+    assert "(Lv 17-25)" in lines[0] and "(Lv 46-60)" in lines[4]
+
+
+def test_new_order_reposts_picker(db):
+    guild = FakeGuild()
+    old_order = tuple(sorted(DEFAULT_EVENTS, key=lambda e: e.minute))  # time order
+    run(guild, db, events=old_order)
+    old_message = roles_message(guild, db)
+
+    report = run(guild, db)  # level order
+    new_message = roles_message(guild, db)
+    assert new_message is not old_message and old_message.deleted
+    assert [r.emoji for r in new_message.reactions] == [e.emoji for e in DEFAULT_EVENTS]
+    assert report.created == [f"reposted role picker in #{ROLES_CHANNEL} (new order)"]
+
+
+def test_adding_last_event_does_not_repost(db):
+    guild = FakeGuild()
+    run(guild, db)
+    message = roles_message(guild, db)
+    high = Event(key="new", name="High", minute=20, emoji="⭐", min_level=100, max_level=110)
+    run(guild, db, events=(*DEFAULT_EVENTS, high))
+    assert roles_message(guild, db) is message and not message.deleted
+
+
+def test_adding_event_in_the_middle_reposts(db):
+    guild = FakeGuild()
+    run(guild, db)
+    message = roles_message(guild, db)
+    mid = Event(key="mid", name="Mid", minute=20, emoji="⭐", min_level=20, max_level=30)
+    events = (DEFAULT_EVENTS[0], mid, *DEFAULT_EVENTS[1:])
+    run(guild, db, events=events)
+    assert message.deleted
+    assert [r.emoji for r in roles_message(guild, db).reactions] == [e.emoji for e in events]

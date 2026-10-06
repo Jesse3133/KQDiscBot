@@ -11,7 +11,14 @@ from discord.ext import commands
 
 from kqbot.cogs.common import event_choices
 from kqbot.cogs.reminders import find_problems
-from kqbot.events import MAX_EVENTS, Event, custom_emoji_id, make_key, normalize_emoji
+from kqbot.events import (
+    MAX_EVENTS,
+    MAX_LEVEL,
+    Event,
+    custom_emoji_id,
+    make_key,
+    normalize_emoji,
+)
 from kqbot.formatting import describe_event, next_line, ts
 from kqbot.reminders import REMINDER_LEAD
 from kqbot.schedule import MAX_SHIFT_MINUTES
@@ -133,6 +140,8 @@ class AdminCommands(commands.Cog):
         interval="How often it repeats (default every 2 hours)",
         first_hour="Any hour it starts at, in game time (0-23). Default 1 = odd hours",
         duration="Recruitment length in minutes (default 30)",
+        min_level="Lowest level that can join (set with max_level)",
+        max_level="Highest level that can join (set with min_level)",
     )
     @app_commands.choices(interval=INTERVALS)
     async def event_add(
@@ -144,6 +153,8 @@ class AdminCommands(commands.Cog):
         interval: app_commands.Choice[int] | None = None,
         first_hour: app_commands.Range[int, 0, 23] = 1,
         duration: app_commands.Range[int, 1, 1440] = 30,
+        min_level: app_commands.Range[int, 1, MAX_LEVEL] | None = None,
+        max_level: app_commands.Range[int, 1, MAX_LEVEL] | None = None,
     ) -> None:
         if len(self.bot.events) >= MAX_EVENTS:
             await interaction.response.send_message(
@@ -165,6 +176,8 @@ class AdminCommands(commands.Cog):
                 interval_hours=interval.value if interval else 2,
                 first_hour=first_hour,
                 duration_minutes=duration,
+                min_level=min_level,
+                max_level=max_level,
             )
         except ValueError as error:
             await interaction.response.send_message(f"Can't add that: {error}.", ephemeral=True)
@@ -191,6 +204,8 @@ class AdminCommands(commands.Cog):
         interval="New repeat interval",
         first_hour="Any hour it starts at, in game time (0-23)",
         duration="New recruitment length in minutes",
+        min_level="Lowest level that can join. 0 (with max_level 0) removes the range",
+        max_level="Highest level that can join. 0 (with min_level 0) removes the range",
     )
     @app_commands.choices(interval=INTERVALS)
     async def event_edit(
@@ -203,6 +218,8 @@ class AdminCommands(commands.Cog):
         interval: app_commands.Choice[int] | None = None,
         first_hour: app_commands.Range[int, 0, 23] | None = None,
         duration: app_commands.Range[int, 1, 1440] | None = None,
+        min_level: app_commands.Range[int, 0, MAX_LEVEL] | None = None,
+        max_level: app_commands.Range[int, 0, MAX_LEVEL] | None = None,
     ) -> None:
         old = self._find(event)
         if old is None:
@@ -219,6 +236,11 @@ class AdminCommands(commands.Cog):
             "duration_minutes": duration,
         }
         changes = {k: v for k, v in changes.items() if v is not None}
+        # Levels: 0 means "no range", so map it to None after filtering.
+        if min_level is not None:
+            changes["min_level"] = min_level or None
+        if max_level is not None:
+            changes["max_level"] = max_level or None
         if not changes:
             await interaction.response.send_message(
                 "Nothing to change. Fill in at least one option.", ephemeral=True

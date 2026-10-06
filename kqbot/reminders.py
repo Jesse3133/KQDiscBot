@@ -23,4 +23,5 @@ def due_reminders(
         occ = schedule.next(event, now)
         if occ.start - lead <= now:
             due.append(occ)
-    return due
+    # Post in the order events start, not the order they're listed in.
+    return sorted(due, key=lambda occ: occ.start)
