@@ -14,6 +14,10 @@ VALID_INTERVALS = (1, 2, 3, 4, 6, 8, 12, 24)
 MAX_EVENTS = 20
 MAX_NAME_LENGTH = 80
 MAX_LEVEL = 999
+# Extra text in reminders. Discord messages max out at 2000 characters, so
+# these leave room for the rest of the reminder.
+MAX_NOTE_LENGTH = 500
+MAX_REMINDER_TEXT_LENGTH = 1000
 
 # Custom emoji markup, e.g. <:honey:1234567890> or <a:spin:1234567890> (animated).
 CUSTOM_EMOJI = re.compile(r"<a?:(\w{2,32}):(\d{15,25})>")
@@ -31,6 +35,8 @@ class Event:
     # Level range allowed to join, shown on the role picker. Both or neither.
     min_level: int | None = None
     max_level: int | None = None
+    # Extra line(s) shown in this event's reminders, set with /event edit.
+    note: str = ""
 
     def __post_init__(self) -> None:
         if self.interval_hours not in VALID_INTERVALS:
@@ -49,6 +55,8 @@ class Event:
             raise ValueError("set both the minimum and maximum level, or neither")
         if self.min_level is not None and not (1 <= self.min_level <= self.max_level <= MAX_LEVEL):
             raise ValueError(f"levels must be 1 to {MAX_LEVEL}, minimum no higher than maximum")
+        if len(self.note) > MAX_NOTE_LENGTH:
+            raise ValueError(f"the note can be at most {MAX_NOTE_LENGTH} characters")
 
     @property
     def levels(self) -> str:

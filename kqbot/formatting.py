@@ -47,7 +47,13 @@ def roles_message(events: tuple[Event, ...], role_ids: dict[str, int]) -> str:
     return "\n".join(lines)
 
 
-def reminder_message(occ: Occurrence, role_id: int | None, test: bool = False) -> str:
+def reminder_message(
+    occ: Occurrence, role_id: int | None, test: bool = False, extra: str = ""
+) -> str:
+    """The reminder text: header, times, the event's note, then ``extra``.
+
+    ``extra`` is the text set with /config reminder-text, shown on every reminder.
+    """
     event = occ.event
     mention = f"<@&{role_id}> " if role_id else ""
     lines = [
@@ -55,6 +61,7 @@ def reminder_message(occ: Occurrence, role_id: int | None, test: bool = False) -
         f"Starts {ts(occ.start, 't')} ({ts(occ.start, 'R')}){moved_note(occ)} · "
         f"Recruitment closes {ts(occ.end, 't')}",
     ]
+    lines += [text for text in (event.note, extra) if text]
     if test:
         lines.insert(0, "🧪 **Test reminder**: not a real event, just checking pings.")
     return "\n".join(lines)
@@ -75,7 +82,24 @@ def describe_timing(event: Event) -> str:
 
 def describe_event(event: Event) -> str:
     levels = f" ({event.levels})" if event.levels else ""
+    note = f"\n> {event.note.replace(chr(10), chr(10) + '> ')}" if event.note else ""
     return (
         f"{event.emoji} **{event.name}**{levels}: {describe_timing(event)}, "
-        f"recruitment {event.duration_minutes} min"
+        f"recruitment {event.duration_minutes} min{note}"
     )
+
+
+# Typed into a slash command option to clear a text setting.
+CLEAR_WORDS = {"-", "none", "clear"}
+
+
+def parse_text_option(raw: str) -> str:
+    """Turn what an admin typed into stored text.
+
+    Slash command options can't contain line breaks, so ``\\n`` makes one.
+    A clear word (``-``, ``none`` or ``clear``) gives an empty string.
+    """
+    text = raw.strip()
+    if text.lower() in CLEAR_WORDS:
+        return ""
+    return "\n".join(line.strip() for line in text.replace("\\n", "\n").split("\n"))

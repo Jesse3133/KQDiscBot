@@ -43,12 +43,13 @@ every player the times in their own time zone.
 |---|---|
 | `/event list` | Every event with its timing and recruitment length. |
 | `/event add` | Add an event: name, minute, emoji, and optionally interval, first hour, recruitment length and level range (`min_level` + `max_level`). Creates its role and adds it to the role picker. |
-| `/event edit` | Change any of those for an existing event. Only the options you fill in change. Renaming also renames its role; people keep it. Set both levels to `0` to remove the range. |
+| `/event edit` | Change any of those for an existing event. Only the options you fill in change. Renaming also renames its role; people keep it. Set both levels to `0` to remove the range. `note` adds text to that event's reminders (see below). |
 | `/event remove` | Remove an event. Asks for confirmation, then deletes its role (taking it from everyone) and its picker emoji. |
 | `/shift` | Move only the **next** start of one event, or all events, by up to ±180 minutes (e.g. for maintenance). `minutes:0` puts it back. Reminders and `/next` follow the new time. |
 | `/config show` | Current settings. |
 | `/config alerts-channel` | Post reminders in a different channel. |
 | `/config roles-channel` | Move the role picker to a different channel. People keep their roles. |
+| `/config reminder-text` | Text added to the bottom of every reminder (see below). |
 | `/config timezone` | Time zone the game schedules events in. Overrides `GAME_TIMEZONE` in `.env`. |
 | `/setup` | Create anything that's missing: roles, channels, the role picker message. Safe to run any time. |
 | `/test-reminder` | Post a test reminder for every event (or one with `event:`) that really pings the roles, and list anything that would stop pings working. Test messages delete themselves after 5 minutes. |
@@ -110,6 +111,22 @@ afterwards, react on the new message and then remove the reaction.
 - If the bot was offline and comes back within the 3 minutes, it still posts.
   If the event has already started, it skips that reminder. Reminders that
   should have been deleted while it was offline are deleted on startup.
+
+### Adding your own text to reminders
+
+Two optional texts, both empty until you set them:
+
+| Text | Set with | Shows on |
+|---|---|---|
+| Event note | `/event edit event:<name> note:<text>` | That event's reminders only, e.g. where to meet or what to bring. |
+| Shared text | `/config reminder-text text:<text>` | Every reminder, under the event's note, e.g. "React ✅ if you're coming". |
+
+- Type `\n` for a new line: `Meet at Elderine\nBring fire resistance`.
+- Discord formatting works: `**bold**`, `*italics*`, links, `#channel` mentions.
+- Set either to `-` to remove it.
+- `/event list` shows each event's note, and `/config show` shows the shared
+  text. Run `/test-reminder` to see how a reminder looks.
+- Limits: 500 characters per note, 1000 for the shared text.
 
 **Pings not arriving?** Run `/test-reminder`. It posts real test pings and
 lists problems such as missing permissions or a role that isn't mentionable.

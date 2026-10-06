@@ -21,10 +21,14 @@ CHECK_EVERY_SECONDS = 10
 
 
 async def send_reminder(
-    channel: discord.abc.Messageable, occ: Occurrence, role: discord.Role | None, test: bool = False
+    channel: discord.abc.Messageable,
+    occ: Occurrence,
+    role: discord.Role | None,
+    test: bool = False,
+    extra: str = "",
 ) -> discord.Message:
     message = await channel.send(
-        reminder_message(occ, role.id if role else None, test=test),
+        reminder_message(occ, role.id if role else None, test=test, extra=extra),
         # Ping only the event role, never @everyone or users.
         allowed_mentions=discord.AllowedMentions(everyone=False, users=False, roles=True),
     )
@@ -65,6 +69,10 @@ def find_problems(
 class Reminders(commands.Cog):
     def __init__(self, bot) -> None:
         self.bot = bot
+
+    def reminder_text(self) -> str:
+        """Shared text for every reminder, set with /config reminder-text."""
+        return self.bot.db.get_setting("reminder_text") or ""
 
     async def cog_load(self) -> None:
         self.check.start()
@@ -110,7 +118,7 @@ class Reminders(commands.Cog):
         if role is None:
             log.warning("Role for %s missing in %s; posting without a ping", occ.event.name, guild)
         try:
-            message = await send_reminder(channel, occ, role)
+            message = await send_reminder(channel, occ, role, extra=self.reminder_text())
         except discord.HTTPException:
             log.exception("Couldn't post %s reminder in %s", occ.event.name, guild.name)
             return
@@ -167,7 +175,9 @@ class Reminders(commands.Cog):
         delete_at = int((now + TEST_LIFETIME).timestamp())
         for e in events:
             occ = Occurrence(e, now + REMINDER_LEAD)  # pretend it starts in 3 minutes
-            message = await send_reminder(channel, occ, roles[e.key], test=True)
+            message = await send_reminder(
+                channel, occ, roles[e.key], test=True, extra=self.reminder_text()
+            )
             self.bot.db.schedule_delete(PendingDelete(message.id, channel.id, delete_at))
 
         minutes = int(TEST_LIFETIME.total_seconds() // 60)

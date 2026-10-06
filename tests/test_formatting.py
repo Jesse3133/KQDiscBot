@@ -1,7 +1,10 @@
+from dataclasses import replace
 from datetime import UTC, datetime
 
+import pytest
+
 from kqbot.events import DEFAULT_EVENTS, Event
-from kqbot.formatting import next_line, roles_message, ts
+from kqbot.formatting import next_line, parse_text_option, reminder_message, roles_message, ts
 from kqbot.schedule import Occurrence
 
 HONEYING = next(e for e in DEFAULT_EVENTS if e.key == "honeying")
@@ -37,3 +40,30 @@ def test_roles_message_lists_every_event():
 def test_roles_message_without_levels():
     plain = (Event("a", "Plain", 0, "⭐"),)
     assert roles_message(plain, {}).endswith("⭐ Plain")
+
+
+def test_reminder_includes_note_then_shared_text():
+    noted = replace(HONEYING, note="Meet at Elderine\nBring potions")
+    text = reminder_message(Occurrence(noted, START), 42, extra="React ✅ if coming")
+    lines = text.splitlines()
+    assert lines[0].startswith("<@&42> 🍯 **Mean Giant Honeying**")
+    assert lines[2:] == ["Meet at Elderine", "Bring potions", "React ✅ if coming"]
+
+
+def test_reminder_without_extra_text_is_unchanged():
+    assert len(reminder_message(Occurrence(HONEYING, START), 42).splitlines()) == 2
+
+
+@pytest.mark.parametrize(
+    ("raw", "stored"),
+    [
+        ("Meet at Elderine", "Meet at Elderine"),
+        (r"Line one\nLine two", "Line one\nLine two"),
+        (r"  spaced \n  out  ", "spaced\nout"),
+        ("-", ""),
+        ("None", ""),
+        ("clear", ""),
+    ],
+)
+def test_parse_text_option(raw, stored):
+    assert parse_text_option(raw) == stored

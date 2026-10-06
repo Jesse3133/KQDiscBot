@@ -219,3 +219,44 @@ def test_edit_levels_reorders_and_clears(env):
     pirates = next(e for e in env.bot.events if e.key == "pirates")
     assert pirates.levels == ""
     assert "set both" in edit(min_level=20)
+
+
+def test_event_note_set_and_cleared(env):
+    def edit(note):
+        return call(env.cog.event_edit, env, interaction(env.guild), "honeying", note=note)
+
+    assert "> Meet at Elderine\n> Bring potions" in edit(r"Meet at Elderine\nBring potions")
+    honeying = next(e for e in env.bot.events if e.key == "honeying")
+    assert honeying.note == "Meet at Elderine\nBring potions"
+    assert "at most 500" in edit("x" * 501)
+
+    edit("-")
+    assert next(e for e in env.bot.events if e.key == "honeying").note == ""
+
+
+def test_reminder_text_set_show_and_clear(env):
+    text = call(env.cog.config_reminder_text, env, interaction(env.guild), r"Group up\nin #kq")
+    assert "> Group up\n> in #kq" in text
+    assert env.bot.db.get_setting("reminder_text") == "Group up\nin #kq"
+    assert "> Group up" in call(env.cog.config_show, env, interaction(env.guild))
+    assert "limit is 1000" in call(
+        env.cog.config_reminder_text, env, interaction(env.guild), "x" * 1001
+    )
+
+    assert "Removed" in call(env.cog.config_reminder_text, env, interaction(env.guild), "-")
+    assert env.bot.db.get_setting("reminder_text") == ""
+    assert "every reminder:** none" in call(env.cog.config_show, env, interaction(env.guild))
+
+
+def test_real_and_test_reminders_include_texts(env):
+    call(env.cog.event_edit, env, interaction(env.guild), "honeying", note="Bring potions")
+    call(env.cog.config_reminder_text, env, interaction(env.guild), "React if coming")
+    reminders = env.bot.get_cog("Reminders")
+    alerts = env.guild.get_channel(env.bot.db.get_guild(env.guild.id).alerts_channel_id)
+
+    # A real reminder, 3 minutes before the next Honeying start.
+    honeying = next(e for e in env.bot.events if e.key == "honeying")
+    start = env.bot.schedule.next(honeying, datetime.now(UTC)).start
+    asyncio.run(reminders.tick(start - timedelta(minutes=2)))
+    (message,) = [m for m in alerts.messages.values() if "Honeying" in m.content]
+    assert message.content.endswith("Bring potions\nReact if coming")

@@ -76,10 +76,14 @@ MIGRATIONS = (
     UPDATE events SET min_level = 40, max_level = 50 WHERE key = 'honeying';
     UPDATE events SET min_level = 46, max_level = 60 WHERE key = 'dragon';
     """,
+    """
+    ALTER TABLE events ADD COLUMN note TEXT NOT NULL DEFAULT '';
+    """,
 )
 
 EVENT_COLUMNS = (
-    "key, name, minute, emoji, interval_hours, first_hour, duration_minutes, min_level, max_level"
+    "key, name, minute, emoji, interval_hours, first_hour, duration_minutes,"
+    " min_level, max_level, note"
 )
 
 
@@ -94,6 +98,7 @@ def _event_values(event: Event) -> tuple:
         event.duration_minutes,
         event.min_level,
         event.max_level,
+        event.note,
     )
 
 
@@ -137,7 +142,7 @@ class Database:
         with self.conn:
             self.conn.executemany(
                 f"INSERT INTO events ({EVENT_COLUMNS}, position)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [(*_event_values(e), position) for position, e in enumerate(events)],
             )
 
@@ -145,7 +150,7 @@ class Database:
         with self.conn:
             self.conn.execute(
                 f"INSERT INTO events ({EVENT_COLUMNS}, position) VALUES"
-                " (?, ?, ?, ?, ?, ?, ?, ?, ?,"
+                " (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
                 " (SELECT COALESCE(MAX(position) + 1, 0) FROM events))",
                 _event_values(event),
             )
@@ -154,8 +159,8 @@ class Database:
         with self.conn:
             self.conn.execute(
                 "UPDATE events SET name = ?, minute = ?, emoji = ?, interval_hours = ?,"
-                " first_hour = ?, duration_minutes = ?, min_level = ?, max_level = ?"
-                " WHERE key = ?",
+                " first_hour = ?, duration_minutes = ?, min_level = ?, max_level = ?,"
+                " note = ? WHERE key = ?",
                 (*_event_values(event)[1:], event.key),
             )
 

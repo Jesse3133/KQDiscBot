@@ -14,12 +14,13 @@ from kqbot.cogs.reminders import find_problems
 from kqbot.events import (
     MAX_EVENTS,
     MAX_LEVEL,
+    MAX_REMINDER_TEXT_LENGTH,
     Event,
     custom_emoji_id,
     make_key,
     normalize_emoji,
 )
-from kqbot.formatting import describe_event, next_line, ts
+from kqbot.formatting import describe_event, next_line, parse_text_option, ts
 from kqbot.reminders import REMINDER_LEAD
 from kqbot.schedule import MAX_SHIFT_MINUTES
 
@@ -206,6 +207,7 @@ class AdminCommands(commands.Cog):
         duration="New recruitment length in minutes",
         min_level="Lowest level that can join. 0 (with max_level 0) removes the range",
         max_level="Highest level that can join. 0 (with min_level 0) removes the range",
+        note="Extra text in this event's reminders. \\n = new line, - = remove",
     )
     @app_commands.choices(interval=INTERVALS)
     async def event_edit(
@@ -220,6 +222,7 @@ class AdminCommands(commands.Cog):
         duration: app_commands.Range[int, 1, 1440] | None = None,
         min_level: app_commands.Range[int, 0, MAX_LEVEL] | None = None,
         max_level: app_commands.Range[int, 0, MAX_LEVEL] | None = None,
+        note: str | None = None,
     ) -> None:
         old = self._find(event)
         if old is None:
@@ -241,6 +244,8 @@ class AdminCommands(commands.Cog):
             changes["min_level"] = min_level or None
         if max_level is not None:
             changes["max_level"] = max_level or None
+        if note is not None:
+            changes["note"] = parse_text_option(note)
         if not changes:
             await interaction.response.send_message(
                 "Nothing to change. Fill in at least one option.", ephemeral=True
@@ -393,6 +398,7 @@ class AdminCommands(commands.Cog):
             return f"<#{channel_id}>" if channel_id else "not set (run `/setup`)"
 
         minutes = int(REMINDER_LEAD.total_seconds() // 60)
+        extra = self.bot.db.get_setting("reminder_text") or ""
         tz_source = "set with /config" if self.bot.db.get_setting("timezone") else "from .env"
         await interaction.response.send_message(
             "\n".join(
@@ -401,6 +407,8 @@ class AdminCommands(commands.Cog):
                     f"**Reminders channel:** {channel(settings and settings.alerts_channel_id)}",
                     f"**Role picker channel:** {channel(settings and settings.roles_channel_id)}",
                     f"**Reminder time:** {minutes} minutes before the start",
+                    "**Text on every reminder:** "
+                    + (f"\n> {extra.replace(chr(10), chr(10) + '> ')}" if extra else "none"),
                     f"**Events:** {len(self.bot.events)} (see `/event list`)",
                 ]
             ),
@@ -465,6 +473,24 @@ class AdminCommands(commands.Cog):
             f"The role picker is now in {channel.mention}. People keep the roles they have.",
             ephemeral=True,
         )
+
+    @config.command(name="reminder-text", description="Text added to the bottom of every reminder")
+    @app_commands.describe(text="Text for every reminder. \\n = new line, - = remove")
+    async def config_reminder_text(self, interaction: discord.Interaction, text: str) -> None:
+        value = parse_text_option(text)
+        if len(value) > MAX_REMINDER_TEXT_LENGTH:
+            await interaction.response.send_message(
+                f"That's {len(value)} characters; the limit is {MAX_REMINDER_TEXT_LENGTH}.",
+                ephemeral=True,
+            )
+            return
+        self.bot.db.set_setting("reminder_text", value)
+        if not value:
+            reply = "Removed the text from reminders."
+        else:
+            quoted = value.replace("\n", "\n> ")
+            reply = f"Every reminder now ends with:\n> {quoted}\nTry `/test-reminder` to see it."
+        await interaction.response.send_message(reply, ephemeral=True)
 
     @config.command(name="timezone", description="Set the time zone the game schedules events in")
     @app_commands.describe(name="IANA time zone, e.g. America/Los_Angeles or UTC")
