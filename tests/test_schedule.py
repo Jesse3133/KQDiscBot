@@ -83,7 +83,7 @@ def test_spring_forward_odd_hours_unaffected():
 
 
 def test_spring_forward_skipped_time_does_not_happen():
-    even = Event(key="even", name="Even", minute=30, emoji="x", first_hour=0)
+    even = Event(key="even", name="Even", minute=30, emoji="⭐", first_hour=0)
     times = starts(even, utc(2027, 3, 14, 7, 0), 2)
     # 00:30 PST, then 02:30 doesn't exist, so 04:30 PDT.
     assert [t.astimezone(PACIFIC).hour for t in times] == [0, 4]
@@ -120,10 +120,10 @@ def test_naive_datetime_rejected():
 )
 def test_invalid_event_rejected(kwargs):
     with pytest.raises(ValueError):
-        Event(key="bad", name="Bad", emoji="x", **{"minute": 0, **kwargs})
+        Event(key="bad", name="Bad", emoji="⭐", **{"minute": 0, **kwargs})
 
 
 def test_hourly_event():
-    hourly = Event(key="h", name="H", minute=15, emoji="x", interval_hours=1)
+    hourly = Event(key="h", name="H", minute=15, emoji="⭐", interval_hours=1)
     times = starts(hourly, utc(2026, 10, 6), 3)
     assert all(b - a == timedelta(hours=1) for a, b in zip(times, times[1:], strict=False))

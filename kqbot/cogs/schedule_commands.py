@@ -6,7 +6,6 @@ from discord.ext import commands
 
 from kqbot.cogs.common import event_choices
 from kqbot.formatting import next_line
-from kqbot.schedule import current_occurrence, next_occurrence
 
 
 class ScheduleCommands(commands.Cog):
@@ -26,9 +25,9 @@ class ScheduleCommands(commands.Cog):
                 return
 
         now = datetime.now(UTC)
-        tz = self.bot.config.game_tz
+        schedule = self.bot.schedule
         rows = sorted(
-            ((next_occurrence(e, now, tz), current_occurrence(e, now, tz)) for e in events),
+            ((schedule.next(e, now), schedule.current(e, now)) for e in events),
             # Open recruitment first, then soonest start.
             key=lambda pair: (pair[1] is None, pair[0].start),
         )

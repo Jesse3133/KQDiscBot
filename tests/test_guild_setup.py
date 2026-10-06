@@ -1,4 +1,5 @@
 import asyncio
+from dataclasses import replace
 
 import pytest
 
@@ -113,3 +114,45 @@ def test_message_updated_when_events_change(db):
     assert message.edits == 1
     assert "⭐ New Quest" in message.content
     assert [r.emoji for r in message.reactions][-1] == "⭐"
+
+
+def test_renamed_event_renames_role(db):
+    guild = FakeGuild()
+    run(guild, db)
+    role_id = db.get_event_roles(guild.id)["honeying"]
+    renamed = tuple(
+        replace(e, name="Honey Time") if e.key == "honeying" else e for e in DEFAULT_EVENTS
+    )
+    report = run(guild, db, events=renamed)
+    assert report.created == ["renamed @Mean Giant Honeying to @Honey Time"]
+    assert guild.get_role(role_id).name == "Honey Time"
+    assert len(guild.roles) == 5
+
+
+def test_changed_emoji_swaps_reaction(db):
+    guild = FakeGuild()
+    run(guild, db)
+    changed = tuple(replace(e, emoji="🐝") if e.key == "honeying" else e for e in DEFAULT_EVENTS)
+    run(guild, db, events=changed)
+    emojis = [r.emoji for r in roles_message(guild, db).reactions]
+    assert "🍯" not in emojis and "🐝" in emojis and len(emojis) == 5
+
+
+def test_removed_event_drops_reaction(db):
+    guild = FakeGuild()
+    run(guild, db)
+    fewer = tuple(e for e in DEFAULT_EVENTS if e.key != "honeying")
+    run(guild, db, events=fewer)
+    message = roles_message(guild, db)
+    assert "🍯" not in [r.emoji for r in message.reactions]
+    assert "Mean Giant Honeying" not in message.content
+
+
+def test_custom_emoji_reaction(db):
+    guild = FakeGuild()
+    custom = Event(key="c", name="Custom", minute=5, emoji="<:honey:123456789012345678>")
+    run(guild, db, events=(custom,))
+    assert [r.emoji for r in roles_message(guild, db).reactions] == ["<:honey:123456789012345678>"]
+    # Running again doesn't add it twice.
+    run(guild, db, events=(custom,))
+    assert len(roles_message(guild, db).reactions) == 1

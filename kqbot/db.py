@@ -52,6 +52,20 @@ MIGRATIONS = (
         delete_at INTEGER NOT NULL
     );
     """,
+    """
+    -- Bot-wide settings changed with /config (e.g. timezone).
+    CREATE TABLE settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    );
+    -- One-off moves of a single occurrence, made with /shift.
+    CREATE TABLE shifts (
+        event_key TEXT NOT NULL,
+        base_start_ts INTEGER NOT NULL,
+        minutes INTEGER NOT NULL,
+        PRIMARY KEY (event_key, base_start_ts)
+    );
+    """,
 )
 
 
@@ -109,6 +123,44 @@ class Database:
                     for position, e in enumerate(events)
                 ],
             )
+
+    def add_event(self, event: Event) -> None:
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO events VALUES"
+                " (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position) + 1, 0) FROM events))",
+                (
+                    event.key,
+                    event.name,
+                    event.minute,
+                    event.emoji,
+                    event.interval_hours,
+                    event.first_hour,
+                    event.duration_minutes,
+                ),
+            )
+
+    def update_event(self, event: Event) -> None:
+        with self.conn:
+            self.conn.execute(
+                "UPDATE events SET name = ?, minute = ?, emoji = ?, interval_hours = ?,"
+                " first_hour = ?, duration_minutes = ? WHERE key = ?",
+                (
+                    event.name,
+                    event.minute,
+                    event.emoji,
+                    event.interval_hours,
+                    event.first_hour,
+                    event.duration_minutes,
+                    event.key,
+                ),
+            )
+
+    def delete_event(self, key: str) -> None:
+        with self.conn:
+            self.conn.execute("DELETE FROM events WHERE key = ?", (key,))
+            self.conn.execute("DELETE FROM event_roles WHERE event_key = ?", (key,))
+            self.conn.execute("DELETE FROM shifts WHERE event_key = ?", (key,))
 
     def load_events(self) -> tuple[Event, ...]:
         rows = self.conn.execute(
@@ -198,3 +250,39 @@ class Database:
     def remove_pending_delete(self, message_id: int) -> None:
         with self.conn:
             self.conn.execute("DELETE FROM pending_deletes WHERE message_id = ?", (message_id,))
+
+    # Settings
+
+    def get_setting(self, key: str) -> str | None:
+        row = self.conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else None
+
+    def set_setting(self, key: str, value: str) -> None:
+        with self.conn:
+            self.conn.execute("INSERT OR REPLACE INTO settings VALUES (?, ?)", (key, value))
+
+    # Shifts
+
+    def load_shifts(self) -> dict[str, dict[int, int]]:
+        shifts: dict[str, dict[int, int]] = {}
+        for row in self.conn.execute("SELECT event_key, base_start_ts, minutes FROM shifts"):
+            shifts.setdefault(row["event_key"], {})[row["base_start_ts"]] = row["minutes"]
+        return shifts
+
+    def set_shift(self, event_key: str, base_start_ts: int, minutes: int) -> None:
+        """Move one occurrence by ``minutes``; 0 puts it back on its normal time."""
+        with self.conn:
+            if minutes:
+                self.conn.execute(
+                    "INSERT OR REPLACE INTO shifts VALUES (?, ?, ?)",
+                    (event_key, base_start_ts, minutes),
+                )
+            else:
+                self.conn.execute(
+                    "DELETE FROM shifts WHERE event_key = ? AND base_start_ts = ?",
+                    (event_key, base_start_ts),
+                )
+
+    def prune_shifts(self, before_ts: int) -> None:
+        with self.conn:
+            self.conn.execute("DELETE FROM shifts WHERE base_start_ts < ?", (before_ts,))

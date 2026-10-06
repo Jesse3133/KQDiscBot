@@ -12,7 +12,7 @@ from kqbot.db import Database, GuildSettings, PendingDelete
 from kqbot.events import DEFAULT_EVENTS
 from kqbot.formatting import reminder_message, ts
 from kqbot.reminders import due_reminders
-from kqbot.schedule import Occurrence
+from kqbot.schedule import Occurrence, Schedule
 from tests.fakes import FakeChannel, FakeGuild, FakeRole
 
 PACIFIC = ZoneInfo("America/Los_Angeles")
@@ -24,7 +24,7 @@ def utc(*args: int) -> datetime:
 
 
 def due_keys(now):
-    return [o.event.key for o in due_reminders(DEFAULT_EVENTS, now, PACIFIC)]
+    return [o.event.key for o in due_reminders(DEFAULT_EVENTS, now, Schedule(PACIFIC))]
 
 
 # Pure timing ---------------------------------------------------------------
@@ -95,7 +95,7 @@ def world(tmp_path):
     bot = SimpleNamespace(
         db=db,
         events=DEFAULT_EVENTS,
-        config=SimpleNamespace(game_tz=PACIFIC),
+        schedule=Schedule(PACIFIC),
         get_guild=lambda gid: guild if gid == guild.id else None,
         get_partial_messageable=Partial,
     )
@@ -267,6 +267,7 @@ def test_one_day_of_reminders_is_twelve_per_event():
     now = utc(2026, 10, 6, 7, 0)
     posted = set()
     for minute in range(24 * 60):
-        for occ in due_reminders(DEFAULT_EVENTS, now + timedelta(minutes=minute), PACIFIC):
+        moment = now + timedelta(minutes=minute)
+        for occ in due_reminders(DEFAULT_EVENTS, moment, Schedule(PACIFIC)):
             posted.add((occ.event.key, occ.start))
     assert len(posted) == 12 * len(DEFAULT_EVENTS)

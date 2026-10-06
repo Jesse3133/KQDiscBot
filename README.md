@@ -25,22 +25,65 @@ every player the times in their own time zone.
 | 2 | Bot connects, `/next` command | ✅ |
 | 3 | Auto-setup: roles, channels, reaction-role message | ✅ |
 | 4 | Reminders 3 min before, role pings, ✅/❌, auto-delete | ✅ |
-| 5 | Admin commands: `/event`, `/shift`, `/config`, `/setup` | planned |
+| 5 | Admin commands: `/event`, `/shift`, `/config` | ✅ |
 | 6 | Hosting + auto-deploy | planned |
 
 ## Commands
 
-| Command | Who | What it does |
+**Everyone**
+
+| Command | What it does |
+|---|---|
+| `/next` | Next start of every event, soonest first. Events currently recruiting are listed at the top. |
+| `/next event:<name>` | Same, for one event. |
+
+**Admins** (members with **Manage Server**)
+
+| Command | What it does |
+|---|---|
+| `/event list` | Every event with its timing and recruitment length. |
+| `/event add` | Add an event: name, minute, emoji, and optionally interval, first hour and recruitment length. Creates its role and adds it to the role picker. |
+| `/event edit` | Change any of those for an existing event. Only the options you fill in change. Renaming also renames its role; people keep it. |
+| `/event remove` | Remove an event. Asks for confirmation, then deletes its role (taking it from everyone) and its picker emoji. |
+| `/shift` | Move only the **next** start of one event, or all events, by up to ±180 minutes (e.g. for maintenance). `minutes:0` puts it back. Reminders and `/next` follow the new time. |
+| `/config show` | Current settings. |
+| `/config alerts-channel` | Post reminders in a different channel. |
+| `/config roles-channel` | Move the role picker to a different channel. People keep their roles. |
+| `/config timezone` | Time zone the game schedules events in. Overrides `GAME_TIMEZONE` in `.env`. |
+| `/setup` | Create anything that's missing: roles, channels, the role picker message. Safe to run any time. |
+| `/test-reminder` | Post a test reminder for every event (or one with `event:`) that really pings the roles, and list anything that would stop pings working. Test messages delete themselves after 5 minutes. |
+
+Replies are only visible to the person who ran the command. To change who
+can use the admin commands, go to Server Settings → Integrations →
+Fiesta KQ Bot.
+
+Events and the time zone are shared by every server the bot is in. Channels
+and roles are per server.
+
+### Event timing options
+
+Events start at `minute` past the hour, every `interval` hours, on the hours
+that line up with `first_hour` in game time:
+
+| You want | interval | first_hour |
 |---|---|---|
-| `/next` | Everyone | Next start of every event, soonest first. Events currently recruiting are listed at the top. |
-| `/next event:<name>` | Everyone | Same, for one event. |
+| Odd hours (01:00, 03:00, …) | every 2 hours | 1 |
+| Even hours (00:00, 02:00, …) | every 2 hours | 0 |
+| Every hour | every hour | any |
+| 02:00, 06:00, 10:00, … | every 4 hours | 2 |
+| Once a day at 20:00 | once a day | 20 |
 
-| `/setup` | Admins (Manage Server) | Create anything that's missing: roles, channels, the role picker message. Safe to run any time. |
-| `/test-reminder` | Admins (Manage Server) | Post a test reminder for every event (or one with `event:`) that really pings the roles, and list anything that would stop pings working. Test messages delete themselves after 5 minutes. |
+### Custom emojis
 
-Replies are only visible to the person who ran the command. Admin commands are
-hidden from members without **Manage Server**. You can change who sees it
-under Server Settings → Integrations → Fiesta KQ Bot.
+Any emoji from a server the bot is in works: pick it from the emoji picker
+when filling in `emoji:`. To use your own icons (e.g. the in-game ones)
+without using up server emoji slots, upload them as **application emojis**:
+
+1. Developer Portal → your app → **Emojis** → **Upload Emoji**.
+2. Copy its markdown (it looks like `<:honey:123456789012345678>`).
+3. Paste that into the `emoji:` option of `/event add` or `/event edit`.
+
+When you change an event's emoji, people keep the role they have.
 
 ## Reminders
 
@@ -53,6 +96,8 @@ under Server Settings → Integrations → Fiesta KQ Bot.
 - ✅ and ❌ are added so people can say whether they're coming.
 - The message is deleted when recruitment closes, 30 minutes after the start.
 - Every event gets its own message, even when two start a minute apart.
+- If an event was moved with `/shift`, the reminder follows the new time and
+  says "moved from …".
 - If the bot was offline and comes back within the 3 minutes, it still posts.
   If the event has already started, it skips that reminder. Reminders that
   should have been deleted while it was offline are deleted on startup.
@@ -75,6 +120,11 @@ start in a server it's already in. Run `/setup` to repeat it any time.
 
 Both channels are read-only for members: they can read and click existing
 reactions, but can't post or add new emojis. Admins can still post.
+
+If someone reacts while the bot is offline, they get the role when the bot
+starts. Removing a reaction while the bot is offline isn't caught up (Discord
+doesn't tell bots about that without an extra privileged permission), so
+that person should react and un-react again.
 
 If something already exists **with the same name**, the bot reuses it instead
 of making a duplicate. If you delete a role, channel or the picker message,
@@ -125,12 +175,12 @@ You need **Python 3.11 or newer**. Check with `python --version`
 | Variable | Required | Default | Meaning |
 |---|---|---|---|
 | `DISCORD_TOKEN` | yes | | Bot token from the Developer Portal |
-| `GAME_TIMEZONE` | no | `America/Los_Angeles` | Time zone the game schedules events in |
+| `GAME_TIMEZONE` | no | `America/Los_Angeles` | Time zone the game schedules events in. `/config timezone` overrides it. |
 | `DEV_GUILD_ID` | no | | Test server ID; slash commands register there instantly |
 | `DATABASE_PATH` | no | `kqbot.sqlite3` | Where the bot stores its data |
 
-The database file holds the event list and which roles, channels and message
-belong to the bot. Back it up if you move the bot to another computer. If
+The database file holds the events, settings changed with `/config`, shifts,
+and which roles, channels and message belong to the bot. Back it up if you move the bot to another computer. If
 it's lost, run `/setup`: the bot finds its roles and channels again by name.
 The only side effect is a fresh role picker message, so delete the old one.
 
@@ -177,16 +227,12 @@ tests/             unit tests (Discord is faked, no token needed)
 docs/              setup guides
 ```
 
-### Changing event times (for now)
+### Where events are stored
 
-The defaults live in [`kqbot/events.py`](kqbot/events.py). Each event has a
-`minute`, an `interval_hours` (2) and a `first_hour` (1, which together mean
-odd hours). They're copied into the database on first start, and after that
-the database is what the bot uses.
-
-Until the admin commands (phase 5) exist, to change an event: stop the bot,
-edit `events.py`, delete `kqbot.sqlite3`, start the bot, run `/setup`, and
-delete the old role picker message.
+The 5 starting events are defined in [`kqbot/events.py`](kqbot/events.py) and
+copied into the database the first time the bot starts. After that the
+database is what counts: change events with the `/event` commands, not by
+editing `events.py`.
 
 ### How daylight saving is handled
 
@@ -200,5 +246,5 @@ just like the game does:
 
 > **To check after Nov 1, 2026:** Mean Giant Honeying should start at
 > **17:03 UTC** (9:03 AM PST). If it's still at 16:03 UTC, the game actually
-> runs on UTC: set `GAME_TIMEZONE=UTC` and change `first_hour` to `0` (see
-> "Changing event times" above).
+> runs on UTC: run `/config timezone name:UTC`, then
+> `/event edit first_hour:0` for each event.

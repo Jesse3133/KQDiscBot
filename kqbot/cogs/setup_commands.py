@@ -42,10 +42,31 @@ class SetupCommands(commands.Cog):
         if self._startup_done:
             return
         self._startup_done = True
-        # Servers the bot joined before setup existed, or while it was offline.
+        reaction_roles = self.bot.get_cog("ReactionRoles")
         for guild in self.bot.guilds:
+            # Servers the bot joined before setup existed, or while it was offline.
             if self.bot.db.get_guild(guild.id) is None:
                 await self._setup_quietly(guild)
+            try:
+                await reaction_roles.sync_guild(guild)
+            except Exception:
+                log.exception("Reaction role catch-up failed in %s", guild.name)
+
+    async def setup_all(self) -> list[str]:
+        """Re-run setup everywhere, e.g. after events change. Returns problems."""
+        problems = []
+        for settings in self.bot.db.list_guilds():
+            guild = self.bot.get_guild(settings.guild_id)
+            if guild is None:
+                continue
+            try:
+                await self.run_setup(guild)
+            except discord.Forbidden:
+                problems.append(f"{guild.name}: {MISSING_PERMISSIONS}")
+            except discord.HTTPException as error:
+                log.exception("Setup in %s failed", guild.name)
+                problems.append(f"{guild.name}: {error.text or error}")
+        return problems
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild) -> None:

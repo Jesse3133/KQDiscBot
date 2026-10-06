@@ -45,6 +45,12 @@ async def _ensure_role(
     guild: discord.Guild, event: Event, stored_id: int | None, report: SetupReport
 ) -> discord.Role:
     role = guild.get_role(stored_id) if stored_id else None
+    if role is not None and role.name != event.name:
+        # The event was renamed; keep the role (and who has it), update its name.
+        old_name = role.name
+        await role.edit(name=event.name, reason=REASON)
+        report.created.append(f"renamed @{old_name} to @{event.name}")
+        return role
     if role is None:
         role = discord.utils.get(guild.roles, name=event.name)
     if role is not None:
@@ -96,10 +102,21 @@ async def _ensure_roles_message(
     elif message.content != content:
         await message.edit(content=content, allowed_mentions=no_pings)
 
-    present = {normalize_emoji(str(r.emoji)) for r in message.reactions if r.me}
+    wanted = {normalize_emoji(e.emoji) for e in events}
+    present = set()
+    for reaction in message.reactions:
+        if not reaction.me:
+            continue
+        emoji = normalize_emoji(str(reaction.emoji))
+        if emoji in wanted:
+            present.add(emoji)
+        else:
+            # Event removed or its emoji changed.
+            await message.remove_reaction(reaction.emoji, channel.guild.me)
     for event in events:
         if normalize_emoji(event.emoji) not in present:
-            await message.add_reaction(event.emoji)
+            # from_str handles both Unicode and <:name:id> custom emojis.
+            await message.add_reaction(discord.PartialEmoji.from_str(event.emoji))
     return message
 
 

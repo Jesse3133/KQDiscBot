@@ -1,10 +1,9 @@
 """Which reminders are due right now. Pure logic, no Discord."""
 
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
 
 from kqbot.events import Event
-from kqbot.schedule import Occurrence, next_occurrence
+from kqbot.schedule import Occurrence, Schedule
 
 REMINDER_LEAD = timedelta(minutes=3)
 # Test reminders clean themselves up after this long.
@@ -12,7 +11,7 @@ TEST_LIFETIME = timedelta(minutes=5)
 
 
 def due_reminders(
-    events: tuple[Event, ...], now: datetime, tz: ZoneInfo, lead: timedelta = REMINDER_LEAD
+    events: tuple[Event, ...], now: datetime, schedule: Schedule, lead: timedelta = REMINDER_LEAD
 ) -> list[Occurrence]:
     """Occurrences whose reminder window is open: ``start - lead <= now < start``.
 
@@ -21,7 +20,7 @@ def due_reminders(
     """
     due = []
     for event in events:
-        occ = next_occurrence(event, now, tz)
+        occ = schedule.next(event, now)
         if occ.start - lead <= now:
             due.append(occ)
     return due

@@ -15,6 +15,9 @@ class FakeRole:
     mentionable: bool = False
     id: int = field(default_factory=lambda: next(_ids))
 
+    async def edit(self, name, reason=None):
+        self.name = name
+
 
 @dataclass
 class FakeReaction:
@@ -35,7 +38,10 @@ class FakeMessage:
         self.edits += 1
 
     async def add_reaction(self, emoji):
-        self.reactions.append(FakeReaction(emoji))
+        self.reactions.append(FakeReaction(str(emoji)))
+
+    async def remove_reaction(self, emoji, member):
+        self.reactions = [r for r in self.reactions if r.emoji != emoji]
 
 
 @dataclass
@@ -44,6 +50,7 @@ class FakeChannel:
     overwrites: dict = field(default_factory=dict)
     id: int = field(default_factory=lambda: next(_ids))
     messages: dict = field(default_factory=dict)
+    guild: object = None
 
     async def send(self, content, allowed_mentions=None):
         message = FakeMessage(content, allowed_mentions=allowed_mentions)
@@ -76,7 +83,11 @@ class FakeGuild:
         self.roles.append(role)
         return role
 
+    def __post_init__(self):
+        for channel in self.text_channels:
+            channel.guild = self
+
     async def create_text_channel(self, name, topic, overwrites, reason):
-        channel = FakeChannel(name, overwrites)
+        channel = FakeChannel(name, overwrites, guild=self)
         self.text_channels.append(channel)
         return channel

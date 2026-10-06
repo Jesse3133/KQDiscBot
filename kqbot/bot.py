@@ -1,4 +1,6 @@
 import logging
+import time
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import discord
 from discord.ext import commands
@@ -6,6 +8,7 @@ from discord.ext import commands
 from kqbot.config import Config
 from kqbot.db import Database
 from kqbot.events import DEFAULT_EVENTS, Event
+from kqbot.schedule import Schedule
 
 log = logging.getLogger(__name__)
 
@@ -14,6 +17,7 @@ EXTENSIONS = (
     "kqbot.cogs.setup_commands",
     "kqbot.cogs.reaction_roles",
     "kqbot.cogs.reminders",
+    "kqbot.cogs.admin_commands",
 )
 
 
@@ -25,6 +29,27 @@ class KQBot(commands.Bot):
         self.db = Database(config.database_path)
         self.db.seed_events(DEFAULT_EVENTS)
         self.events: tuple[Event, ...] = self.db.load_events()
+        self.game_tz = self._load_timezone()
+        self.db.prune_shifts(int(time.time()) - 24 * 3600)
+        self.shifts = self.db.load_shifts()
+
+    def _load_timezone(self) -> ZoneInfo:
+        # /config timezone wins over GAME_TIMEZONE in .env.
+        name = self.db.get_setting("timezone")
+        if name:
+            try:
+                return ZoneInfo(name)
+            except ZoneInfoNotFoundError:
+                log.warning("Saved timezone %r is unknown; using %s", name, self.config.game_tz)
+        return self.config.game_tz
+
+    @property
+    def schedule(self) -> Schedule:
+        return Schedule(self.game_tz, self.shifts)
+
+    def reload_events(self) -> None:
+        self.events = self.db.load_events()
+        self.shifts = self.db.load_shifts()
 
     async def setup_hook(self) -> None:
         for ext in EXTENSIONS:

@@ -78,3 +78,37 @@ def test_emoji_match_ignores_variation_selector():
     bare = pirates.emoji.replace("️", "")
     assert bare != pirates.emoji
     assert find_event_by_emoji(DEFAULT_EVENTS, bare) is pirates
+
+
+def test_sync_gives_roles_for_offline_reactions(tmp_path):
+    db = Database(tmp_path / "sync.sqlite3")
+    db.save_guild(GuildSettings(GUILD_ID, 10, 20, MESSAGE_ID))
+    db.set_event_role(GUILD_ID, "honeying", ROLE_ID)
+    role = SimpleNamespace(id=ROLE_ID, name="Mean Giant Honeying")
+
+    has_role = MagicMock(bot=False, roles=[role], add_roles=AsyncMock())
+    needs_role = MagicMock(bot=False, roles=[], add_roles=AsyncMock())
+    members = {1: has_role, 2: needs_role}
+
+    async def users():
+        for uid, is_bot in ((1, False), (2, False), (BOT_ID, True)):
+            yield SimpleNamespace(id=uid, bot=is_bot)
+
+    reactions = [
+        SimpleNamespace(emoji="🍯", users=users),
+        SimpleNamespace(emoji="😀", users=users),  # not an event
+    ]
+    message = SimpleNamespace(reactions=reactions)
+    channel = SimpleNamespace(fetch_message=AsyncMock(return_value=message))
+    guild = MagicMock(id=GUILD_ID)
+    guild.name = "Test"
+    guild.get_channel = lambda cid: channel if cid == 20 else None
+    guild.get_role = lambda rid: role if rid == ROLE_ID else None
+    guild.get_member = lambda uid: members.get(uid)
+
+    bot = SimpleNamespace(db=db, events=DEFAULT_EVENTS, user=SimpleNamespace(id=BOT_ID))
+    given = asyncio.run(ReactionRoles(bot).sync_guild(guild))
+    assert given == 1
+    needs_role.add_roles.assert_awaited_once()
+    has_role.add_roles.assert_not_awaited()
+    db.close()

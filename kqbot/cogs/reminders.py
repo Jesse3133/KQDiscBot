@@ -86,7 +86,7 @@ class Reminders(commands.Cog):
 
     async def tick(self, now: datetime) -> None:
         await self.delete_expired(now)
-        due = due_reminders(self.bot.events, now, self.bot.config.game_tz)
+        due = due_reminders(self.bot.events, now, self.bot.schedule)
         for settings in self.bot.db.list_guilds():
             for occ in due:
                 start_ts = int(occ.start.timestamp())
