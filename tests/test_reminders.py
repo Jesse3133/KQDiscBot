@@ -93,6 +93,7 @@ def world(tmp_path):
             return SimpleNamespace(delete=delete)
 
     bot = SimpleNamespace(
+        is_allowed=lambda guild_id: True,
         db=db,
         events=DEFAULT_EVENTS,
         schedule=Schedule(PACIFIC),

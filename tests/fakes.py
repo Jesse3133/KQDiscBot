@@ -14,6 +14,12 @@ class FakeRole:
     name: str
     mentionable: bool = False
     id: int = field(default_factory=lambda: next(_ids))
+    permissions: discord.Permissions = field(default_factory=discord.Permissions.none)
+    managed: bool = False
+    default: bool = False
+
+    def is_default(self):
+        return self.default
 
     async def edit(self, name, reason=None):
         self.name = name
@@ -73,7 +79,7 @@ class FakeGuild:
     id: int = field(default_factory=lambda: next(_ids))
     roles: list = field(default_factory=list)
     text_channels: list = field(default_factory=list)
-    default_role: FakeRole = field(default_factory=lambda: FakeRole("@everyone"))
+    default_role: FakeRole = field(default_factory=lambda: FakeRole("@everyone", default=True))
     me: FakeRole = field(default_factory=lambda: FakeRole("Fiesta KQ Bot"))
 
     def get_role(self, role_id):
@@ -82,8 +88,8 @@ class FakeGuild:
     def get_channel(self, channel_id):
         return next((c for c in self.text_channels if c.id == channel_id), None)
 
-    async def create_role(self, name, mentionable, reason):
-        role = FakeRole(name, mentionable)
+    async def create_role(self, name, mentionable, reason, permissions=None):
+        role = FakeRole(name, mentionable, permissions=permissions or discord.Permissions.none())
         self.roles.append(role)
         return role
 

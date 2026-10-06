@@ -11,6 +11,7 @@ import discord
 from kqbot.db import Database, GuildSettings
 from kqbot.events import Event, normalize_emoji
 from kqbot.formatting import roles_message
+from kqbot.role_safety import unsafe_reason
 
 ALERTS_CHANNEL = "kq-alerts"
 ROLES_CHANNEL = "kq-roles"
@@ -45,19 +46,33 @@ async def _ensure_role(
     guild: discord.Guild, event: Event, stored_id: int | None, report: SetupReport
 ) -> discord.Role:
     role = guild.get_role(stored_id) if stored_id else None
-    if role is not None and role.name != event.name:
-        # The event was renamed; keep the role (and who has it), update its name.
-        old_name = role.name
-        await role.edit(name=event.name, reason=REASON)
-        report.created.append(f"renamed @{old_name} to @{event.name}")
+    if role is not None and (reason := unsafe_reason(role)):
+        # Someone gave the event role real permissions. Stop handing it out.
+        report.created.append(f"stopped using @{role.name} for {event.name} because {reason}")
+        role = None
+    elif role is not None:
+        if role.name != event.name:
+            # The event was renamed; keep the role (and who has it), update its name.
+            old_name = role.name
+            await role.edit(name=event.name, reason=REASON)
+            report.created.append(f"renamed @{old_name} to @{event.name}")
+        else:
+            report.reused.append(f"role {event.name}")
         return role
-    if role is None:
-        role = discord.utils.get(guild.roles, name=event.name)
-    if role is not None:
+
+    # Reuse a same-named role only if it's a harmless ping role; never e.g. a
+    # "Moderator" role that happens to share an event's name.
+    existing = discord.utils.get(guild.roles, name=event.name)
+    if existing is not None and not unsafe_reason(existing):
         report.reused.append(f"role {event.name}")
-        return role
-    # Mentionable so reminder pings actually notify people.
-    role = await guild.create_role(name=event.name, mentionable=True, reason=REASON)
+        return existing
+    # No permissions; mentionable so reminder pings actually notify people.
+    role = await guild.create_role(
+        name=event.name,
+        permissions=discord.Permissions.none(),
+        mentionable=True,
+        reason=REASON,
+    )
     report.created.append(f"role @{event.name}")
     return role
 

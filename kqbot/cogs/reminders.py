@@ -96,6 +96,8 @@ class Reminders(commands.Cog):
         await self.delete_expired(now)
         due = due_reminders(self.bot.events, now, self.bot.schedule)
         for settings in self.bot.db.list_guilds():
+            if not self.bot.is_allowed(settings.guild_id):
+                continue
             for occ in due:
                 start_ts = int(occ.start.timestamp())
                 if self.bot.db.reminder_sent(settings.guild_id, occ.event.key, start_ts):

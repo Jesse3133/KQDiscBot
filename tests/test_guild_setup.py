@@ -1,6 +1,7 @@
 import asyncio
 from dataclasses import replace
 
+import discord
 import pytest
 
 from kqbot.db import Database
@@ -204,3 +205,43 @@ def test_adding_event_in_the_middle_reposts(db):
     run(guild, db, events=events)
     assert message.deleted
     assert [r.emoji for r in roles_message(guild, db).reactions] == [e.emoji for e in events]
+
+
+def test_never_reuses_a_powerful_role_by_name(db):
+    moderator = FakeRole("Mean Giant Honeying", permissions=discord.Permissions(kick_members=True))
+    guild = FakeGuild(roles=[moderator])
+    report = run(guild, db)
+    honeying_id = db.get_event_roles(guild.id)["honeying"]
+    assert honeying_id != moderator.id
+    assert guild.get_role(honeying_id).permissions == discord.Permissions.none()
+    assert "role @Mean Giant Honeying" in report.created
+    assert f"<@&{moderator.id}>" not in roles_message(guild, db).content
+
+
+@pytest.mark.parametrize("kwargs", [{"managed": True}, {"default": True}])
+def test_never_reuses_bot_or_everyone_roles(db, kwargs):
+    special = FakeRole("Mean Giant Honeying", **kwargs)
+    guild = FakeGuild(roles=[special])
+    run(guild, db)
+    assert db.get_event_roles(guild.id)["honeying"] != special.id
+
+
+def test_stops_using_event_role_that_gained_permissions(db):
+    guild = FakeGuild()
+    run(guild, db)
+    role = guild.get_role(db.get_event_roles(guild.id)["honeying"])
+    role.permissions = discord.Permissions(administrator=True)
+
+    report = run(guild, db)
+    new_id = db.get_event_roles(guild.id)["honeying"]
+    assert new_id != role.id
+    assert any("stopped using @Mean Giant Honeying" in line for line in report.created)
+    assert any("administrator" in line for line in report.created)
+    assert f"<@&{new_id}>" in roles_message(guild, db).content
+    assert f"<@&{role.id}>" not in roles_message(guild, db).content
+
+
+def test_created_roles_have_no_permissions(db):
+    guild = FakeGuild()
+    run(guild, db)
+    assert all(r.permissions == discord.Permissions.none() for r in guild.roles)
