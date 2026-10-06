@@ -1,0 +1,14 @@
+# For running on your own server or PC with Docker:
+#   docker compose up -d --build     start (and rebuild after changes)
+#   docker compose logs -f           watch the log
+#   docker compose down              stop
+services:
+  bot:
+    build: .
+    env_file: .env
+    environment:
+      # Always keep the database on the volume, whatever .env says.
+      DATABASE_PATH: /data/kqbot.sqlite3
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

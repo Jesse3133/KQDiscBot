@@ -17,3 +17,6 @@ venv/
 .vscode/
 .idea/
 .DS_Store
+
+# Docker volume for the bot database
+data/

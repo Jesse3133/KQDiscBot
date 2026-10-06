@@ -26,7 +26,7 @@ every player the times in their own time zone.
 | 3 | Auto-setup: roles, channels, reaction-role message | ✅ |
 | 4 | Reminders 3 min before, role pings, ✅/❌, auto-delete | ✅ |
 | 5 | Admin commands: `/event`, `/shift`, `/config` | ✅ |
-| 6 | Hosting + auto-deploy | planned |
+| 6 | Hosting + auto-deploy | in progress: Docker + CI done, host to pick ([docs/hosting.md](docs/hosting.md)) |
 
 ## Commands
 
@@ -250,7 +250,10 @@ kqbot/
     reminders.py           reminder loop, cleanup, /test-reminder
     common.py              shared helpers for commands
 tests/             unit tests (Discord is faked, no token needed)
-docs/              setup guides
+docs/              setup and hosting guides
+Dockerfile         container image (data in /data)
+docker-compose.yml run with Docker on your own machine
+.github/workflows/ CI: tests, lint and Docker build on every push
 ```
 
 ### Where events are stored
