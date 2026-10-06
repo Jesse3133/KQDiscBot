@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
 from kqbot.events import DEFAULT_EVENTS
-from kqbot.formatting import next_line, ts
+from kqbot.formatting import next_line, roles_message, ts
 from kqbot.schedule import Occurrence
 
 HONEYING = next(e for e in DEFAULT_EVENTS if e.key == "honeying")
@@ -25,3 +25,10 @@ def test_active_line():
     line = next_line(nxt, prev)
     assert "recruiting now" in line
     assert ts(prev.end, "R") in line
+
+
+def test_roles_message_lists_every_event():
+    text = roles_message(DEFAULT_EVENTS, {"honeying": 42})
+    assert "🍯 Mean Giant Honeying → <@&42>" in text
+    assert "🐉 Mini Dragon HC\n" in text or text.endswith("🐉 Mini Dragon HC")
+    assert text.count("\n") >= len(DEFAULT_EVENTS)

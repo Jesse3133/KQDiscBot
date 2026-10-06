@@ -4,11 +4,16 @@ import discord
 from discord.ext import commands
 
 from kqbot.config import Config
+from kqbot.db import Database
 from kqbot.events import DEFAULT_EVENTS, Event
 
 log = logging.getLogger(__name__)
 
-EXTENSIONS = ("kqbot.cogs.schedule_commands",)
+EXTENSIONS = (
+    "kqbot.cogs.schedule_commands",
+    "kqbot.cogs.setup_commands",
+    "kqbot.cogs.reaction_roles",
+)
 
 
 class KQBot(commands.Bot):
@@ -16,7 +21,9 @@ class KQBot(commands.Bot):
         # Default intents only; nothing privileged is needed.
         super().__init__(command_prefix=commands.when_mentioned, intents=discord.Intents.default())
         self.config = config
-        self.events: tuple[Event, ...] = DEFAULT_EVENTS
+        self.db = Database(config.database_path)
+        self.db.seed_events(DEFAULT_EVENTS)
+        self.events: tuple[Event, ...] = self.db.load_events()
 
     async def setup_hook(self) -> None:
         for ext in EXTENSIONS:
@@ -36,3 +43,7 @@ class KQBot(commands.Bot):
         log.info(
             "Logged in as %s (id %s) in %d server(s)", self.user, self.user.id, len(self.guilds)
         )
+
+    async def close(self) -> None:
+        await super().close()
+        self.db.close()

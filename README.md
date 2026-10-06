@@ -23,7 +23,7 @@ every player the times in their own time zone.
 | 0 | Project setup | ✅ |
 | 1 | Schedule math + tests | ✅ |
 | 2 | Bot connects, `/next` command | ✅ |
-| 3 | Auto-setup: roles, channels, reaction-role message | planned |
+| 3 | Auto-setup: roles, channels, reaction-role message | ✅ |
 | 4 | Reminders 3 min before, role pings, ✅/❌, auto-delete | planned |
 | 5 | Admin commands: `/event`, `/shift`, `/config`, `/setup` | planned |
 | 6 | Hosting + auto-deploy | planned |
@@ -35,7 +35,35 @@ every player the times in their own time zone.
 | `/next` | Everyone | Next start of every event, soonest first. Events currently recruiting are listed at the top. |
 | `/next event:<name>` | Everyone | Same, for one event. |
 
-Replies are only visible to the person who ran the command.
+| `/setup` | Admins (Manage Server) | Create anything that's missing: roles, channels, the role picker message. Safe to run any time. |
+
+Replies are only visible to the person who ran the command. `/setup` is
+hidden from members without **Manage Server**. You can change who sees it
+under Server Settings → Integrations → Fiesta KQ Bot.
+
+## What the bot sets up in your server
+
+This happens automatically when the bot joins a server, or on its first
+start in a server it's already in. Run `/setup` to repeat it any time.
+
+| What | Details |
+|---|---|
+| 5 roles | One per event, named after it (e.g. `@Mean Giant Honeying`). Set to mentionable so reminders can ping them. |
+| `#kq-alerts` | Where reminders will be posted. |
+| `#kq-roles` | Holds the role picker message. |
+| Role picker message | Lists each event with its emoji. React to get that event's role, remove your reaction to lose it. |
+
+Both channels are read-only for members: they can read and click existing
+reactions, but can't post or add new emojis. Admins can still post.
+
+If something already exists **with the same name**, the bot reuses it instead
+of making a duplicate. If you delete a role, channel or the picker message,
+`/setup` puts it back. Renaming a channel is fine: the bot remembers channels
+by ID.
+
+> **Role order matters.** In Server Settings → Roles, the **Fiesta KQ Bot**
+> role must be **above** the 5 event roles, or it can't give them out. Roles
+> the bot creates start out below it, so this only comes up if you move them.
 
 ## Running it locally
 
@@ -79,6 +107,12 @@ You need **Python 3.11 or newer**. Check with `python --version`
 | `DISCORD_TOKEN` | yes | | Bot token from the Developer Portal |
 | `GAME_TIMEZONE` | no | `America/Los_Angeles` | Time zone the game schedules events in |
 | `DEV_GUILD_ID` | no | | Test server ID; slash commands register there instantly |
+| `DATABASE_PATH` | no | `kqbot.sqlite3` | Where the bot stores its data |
+
+The database file holds the event list and which roles, channels and message
+belong to the bot. Back it up if you move the bot to another computer. If
+it's lost, run `/setup`: the bot finds its roles and channels again by name.
+The only side effect is a fresh role picker message, so delete the old one.
 
 ## Development
 
@@ -96,21 +130,29 @@ kqbot/
   __main__.py      entry point (python -m kqbot)
   bot.py           bot client: loads commands, registers slash commands
   config.py        reads settings from .env
-  events.py        the 5 Kingdom Quests and their timing
+  db.py            SQLite storage (events, roles, channels)
+  events.py        the 5 Kingdom Quests and their default timing
+  guild_setup.py   creates/repairs roles, channels, role picker message
   schedule.py      "when does it start next?" math, incl. daylight saving
   formatting.py    message text
   cogs/
     schedule_commands.py   /next
-tests/             unit tests for the schedule math and message text
+    setup_commands.py      /setup, auto-setup on join and first start
+    reaction_roles.py      gives/removes roles on role picker reactions
+tests/             unit tests (Discord is faked, no token needed)
 docs/              setup guides
 ```
 
 ### Changing event times (for now)
 
-Until the admin commands are built, event timing lives in
-[`kqbot/events.py`](kqbot/events.py). Each event has a `minute`, an
-`interval_hours` (2) and a `first_hour` (1, which together mean odd hours).
-Edit, run `pytest`, and restart the bot.
+The defaults live in [`kqbot/events.py`](kqbot/events.py). Each event has a
+`minute`, an `interval_hours` (2) and a `first_hour` (1, which together mean
+odd hours). They're copied into the database on first start, and after that
+the database is what the bot uses.
+
+Until the admin commands (phase 5) exist, to change an event: stop the bot,
+edit `events.py`, delete `kqbot.sqlite3`, start the bot, run `/setup`, and
+delete the old role picker message.
 
 ### How daylight saving is handled
 
@@ -124,5 +166,5 @@ just like the game does:
 
 > **To check after Nov 1, 2026:** Mean Giant Honeying should start at
 > **17:03 UTC** (9:03 AM PST). If it's still at 16:03 UTC, the game actually
-> runs on UTC: set `GAME_TIMEZONE=UTC` and change `first_hour` to `0` in
-> `kqbot/events.py`.
+> runs on UTC: set `GAME_TIMEZONE=UTC` and change `first_hour` to `0` (see
+> "Changing event times" above).

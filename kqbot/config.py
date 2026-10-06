@@ -10,6 +10,7 @@ class Config:
     token: str
     game_tz: ZoneInfo
     dev_guild_id: int | None
+    database_path: str
 
 
 def load_config() -> Config:
@@ -29,4 +30,9 @@ def load_config() -> Config:
     if guild and not guild.isdigit():
         raise SystemExit("DEV_GUILD_ID must be a numeric server ID.")
 
-    return Config(token=token, game_tz=game_tz, dev_guild_id=int(guild) if guild else None)
+    return Config(
+        token=token,
+        game_tz=game_tz,
+        dev_guild_id=int(guild) if guild else None,
+        database_path=os.getenv("DATABASE_PATH", "").strip() or "kqbot.sqlite3",
+    )

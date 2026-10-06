@@ -35,8 +35,18 @@ class Event:
         return (hour - self.first_hour) % self.interval_hours == 0
 
 
-# Seed data. Later phases move these into the database so admins can edit
-# them with slash commands; until then this list is the source of truth.
+def normalize_emoji(emoji: str) -> str:
+    """Drop variation selectors so e.g. "🏴‍☠️" matches with or without U+FE0F."""
+    return emoji.replace("\ufe0f", "")
+
+
+def find_event_by_emoji(events: tuple[Event, ...], emoji: str) -> Event | None:
+    target = normalize_emoji(emoji)
+    return next((e for e in events if normalize_emoji(e.emoji) == target), None)
+
+
+# Seed data: written to the database on first start. After that the database
+# is the source of truth (admin commands to edit it arrive in a later phase).
 DEFAULT_EVENTS: tuple[Event, ...] = (
     Event(key="brigade", name="Midnight Brigade Veteran", minute=0, emoji="🌙"),
     Event(key="robo", name="The Millennium Robo Plot", minute=1, emoji="🤖"),
