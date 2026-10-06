@@ -44,6 +44,8 @@ class SetupCommands(commands.Cog):
         self._startup_done = True
         reaction_roles = self.bot.get_cog("ReactionRoles")
         for guild in self.bot.guilds:
+            if not self.bot.is_allowed(guild.id):
+                continue
             # Servers the bot joined before setup existed, or while it was offline.
             if self.bot.db.get_guild(guild.id) is None:
                 await self._setup_quietly(guild)
@@ -57,7 +59,7 @@ class SetupCommands(commands.Cog):
         problems = []
         for settings in self.bot.db.list_guilds():
             guild = self.bot.get_guild(settings.guild_id)
-            if guild is None:
+            if guild is None or not self.bot.is_allowed(guild.id):
                 continue
             try:
                 await self.run_setup(guild)
@@ -70,6 +72,10 @@ class SetupCommands(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild) -> None:
+        if not self.bot.is_allowed(guild.id):
+            log.warning("Added to %s (%s), which isn't allowed; leaving", guild.name, guild.id)
+            await guild.leave()
+            return
         await self._setup_quietly(guild)
 
     @commands.Cog.listener()

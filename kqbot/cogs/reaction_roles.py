@@ -6,6 +6,7 @@ import discord
 from discord.ext import commands
 
 from kqbot.events import find_event_by_emoji
+from kqbot.role_safety import unsafe_reason
 
 log = logging.getLogger(__name__)
 
@@ -27,6 +28,8 @@ class ReactionRoles(commands.Cog):
     async def _handle(self, payload: discord.RawReactionActionEvent, add: bool) -> None:
         if payload.guild_id is None or payload.user_id == self.bot.user.id:
             return
+        if not self.bot.is_allowed(payload.guild_id):
+            return
         settings = self.bot.db.get_guild(payload.guild_id)
         if settings is None or settings.roles_message_id != payload.message_id:
             return
@@ -39,6 +42,10 @@ class ReactionRoles(commands.Cog):
         role = guild.get_role(role_id) if role_id else None
         if role is None:
             log.warning("Role for %s is missing in %s; run /setup", event.name, guild.name)
+            return
+
+        if add and (reason := unsafe_reason(role)):
+            log.warning("Not giving %s in %s because %s; run /setup", role.name, guild.name, reason)
             return
 
         member = payload.member if add else await self._get_member(guild, payload.user_id)
@@ -64,6 +71,8 @@ class ReactionRoles(commands.Cog):
         be detected without the privileged members intent, so those wait
         until the person reacts and un-reacts again.
         """
+        if not self.bot.is_allowed(guild.id):
+            return 0
         settings = self.bot.db.get_guild(guild.id)
         if settings is None or not settings.roles_message_id:
             return 0
@@ -80,7 +89,7 @@ class ReactionRoles(commands.Cog):
         for reaction in message.reactions:
             event = find_event_by_emoji(self.bot.events, str(reaction.emoji))
             role = guild.get_role(role_ids.get(event.key, 0)) if event else None
-            if role is None:
+            if role is None or unsafe_reason(role):
                 continue
             async for user in reaction.users():
                 if user.bot:

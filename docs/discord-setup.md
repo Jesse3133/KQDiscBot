@@ -21,8 +21,13 @@ to your server.
 > in `.env`, which git ignores. If it ever leaks, click **Reset Token** again
 > and update `.env`.
 
-On the same tab, leave all three **Privileged Gateway Intents** turned off.
-The bot doesn't need them.
+On the same tab:
+
+- Turn **Public Bot** **off**. Otherwise anyone can add your bot to their own
+  server, and since events and settings are shared between servers, their
+  admins could change your reminders.
+- Leave all three **Privileged Gateway Intents** turned off. The bot doesn't
+  need them.
 
 ## 3. Invite the bot to your server
 
@@ -42,16 +47,33 @@ Pick your server and click **Authorize**. That permission number grants:
 | Manage Roles | Create the 5 event roles and give/remove them on reaction |
 | Manage Channels | Create the alerts and roles channels |
 
-Only the first three are used in the current version. The rest are for the
-upcoming setup and reminder features, so you won't need to re-invite later.
+In Server Settings → Roles, keep the **Fiesta KQ Bot** role just above the
+event roles and **below** your moderator and admin roles.
 
-## 4. (Optional) Get your server ID for faster testing
+## 4. Lock the bot to your server
 
-Global slash commands can take a while to appear. While developing, set
-`DEV_GUILD_ID` in `.env` so commands show up in your server immediately:
+Get your server's ID:
 
-1. Discord → **User Settings → Advanced → Developer Mode** on.
-2. Right-click your server icon → **Copy Server ID**.
-3. Paste it into `.env` as `DEV_GUILD_ID=...`.
+1. Discord → **User Settings** (gear icon) → **Advanced** → turn on
+   **Developer Mode**. (Mobile: **You** tab → gear → **Advanced** →
+   **Developer Mode**.)
+2. Right-click your server's icon in the left-hand server list (mobile:
+   long-press it) → **Copy Server ID**. It's a long number like
+   `123456789012345678`.
+3. Put it in `.env`:
 
-Leave it blank once the bot is hosted for real.
+   ```
+   ALLOWED_GUILD_IDS=123456789012345678
+   ```
+
+4. Restart the bot (or the task/service, see [hosting.md](hosting.md)).
+
+The bot now only works in that server. It leaves any other server it's added
+to, and ignores commands from servers it was already in. The startup log
+warns you while `ALLOWED_GUILD_IDS` is empty.
+
+## 5. (Optional) Faster slash command updates while testing
+
+Global slash commands can take a while to appear. While developing, also put
+your server ID in `.env` as `DEV_GUILD_ID=...` so commands show up
+immediately. Leave it blank once the bot is hosted for real.

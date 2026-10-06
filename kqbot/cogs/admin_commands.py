@@ -303,6 +303,8 @@ class AdminCommands(commands.Cog):
 
         problems = []
         for settings in self.bot.db.list_guilds():
+            if not self.bot.is_allowed(settings.guild_id):
+                continue
             guild = self.bot.get_guild(settings.guild_id)
             role_id = self.bot.db.get_event_roles(settings.guild_id).get(old.key)
             role = guild.get_role(role_id) if guild and role_id else None

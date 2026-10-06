@@ -7,6 +7,7 @@ import time
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 from kqbot.config import Config
@@ -25,10 +26,26 @@ EXTENSIONS = (
 )
 
 
+class AllowlistTree(app_commands.CommandTree):
+    """Refuses slash commands from servers that aren't on ALLOWED_GUILD_IDS."""
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.guild_id is None or self.client.is_allowed(interaction.guild_id):
+            return True
+        await interaction.response.send_message(
+            "This bot isn't enabled in this server.", ephemeral=True
+        )
+        return False
+
+
 class KQBot(commands.Bot):
     def __init__(self, config: Config) -> None:
         # Default intents only; nothing privileged is needed.
-        super().__init__(command_prefix=commands.when_mentioned, intents=discord.Intents.default())
+        super().__init__(
+            command_prefix=commands.when_mentioned,
+            intents=discord.Intents.default(),
+            tree_cls=AllowlistTree,
+        )
         self.config = config
         self.db = Database(config.database_path)
         self.db.seed_events(DEFAULT_EVENTS)
@@ -46,6 +63,11 @@ class KQBot(commands.Bot):
             except ZoneInfoNotFoundError:
                 log.warning("Saved timezone %r is unknown; using %s", name, self.config.game_tz)
         return self.config.game_tz
+
+    def is_allowed(self, guild_id: int) -> bool:
+        """Whether the bot should work in this server (see ALLOWED_GUILD_IDS)."""
+        allowed = self.config.allowed_guild_ids
+        return not allowed or guild_id in allowed
 
     @property
     def schedule(self) -> Schedule:
@@ -75,6 +97,18 @@ class KQBot(commands.Bot):
         log.info(
             "Logged in as %s (id %s) in %d server(s)", self.user, self.user.id, len(self.guilds)
         )
+        if not self.config.allowed_guild_ids:
+            log.warning(
+                "ALLOWED_GUILD_IDS is not set, so the bot works in any server it's added to. "
+                "Set it in .env to your server's ID."
+            )
+        for guild in self.guilds:
+            if not self.is_allowed(guild.id):
+                log.warning(
+                    "Ignoring %s (%s): not in ALLOWED_GUILD_IDS. Kick the bot there to remove it.",
+                    guild.name,
+                    guild.id,
+                )
 
     def _stop_when_stdin_closes(self) -> None:
         """Shut down when the supervisor closes our stdin or exits.

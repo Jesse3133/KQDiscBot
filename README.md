@@ -209,6 +209,7 @@ You need **Python 3.11 or newer**. Check with `python --version`
 |---|---|---|---|
 | `DISCORD_TOKEN` | yes | | Bot token from the Developer Portal |
 | `GAME_TIMEZONE` | no | `America/Los_Angeles` | Time zone the game schedules events in. `/config timezone` overrides it. |
+| `ALLOWED_GUILD_IDS` | strongly recommended | | Your server's ID (several: comma-separated). The bot only works there. See [docs/discord-setup.md](docs/discord-setup.md#4-lock-the-bot-to-your-server). |
 | `DEV_GUILD_ID` | no | | Test server ID; slash commands register there instantly |
 | `DATABASE_PATH` | no | `kqbot.sqlite3` | Where the bot stores its data |
 
@@ -216,6 +217,26 @@ The database file holds the events, settings changed with `/config`, shifts,
 and which roles, channels and message belong to the bot. Back it up if you move the bot to another computer. If
 it's lost, run `/setup`: the bot finds its roles and channels again by name.
 The only side effect is a fresh role picker message, so delete the old one.
+
+## Security
+
+- **Lock the bot to your server** with `ALLOWED_GUILD_IDS`, and turn **Public
+  Bot** off in the Developer Portal. Events and settings are shared by every
+  server the bot is in, so a stranger's server must never be able to use it.
+- **The role picker only hands out harmless roles.** The bot never gives a
+  role through the picker that is `@everyone`, belongs to another bot or
+  integration, or has powerful permissions (administrator, kick, ban,
+  manage anything, mention everyone and similar). If an event's name matches
+  such a role, the bot makes its own role instead. If someone adds such
+  permissions to an event role later, the bot stops using it and `/setup`
+  makes a fresh one.
+- **Keep the bot's role low:** just above the event roles, below your
+  moderator and admin roles.
+- **The token stays in `.env`**, which git ignores. If it ever leaks, reset it
+  in the Developer Portal.
+- **Your PC runs whatever is merged into `main`.** Use two-factor
+  authentication on GitHub, and consider a branch rule requiring pull requests
+  with passing CI.
 
 ## Troubleshooting
 
@@ -226,6 +247,7 @@ The only side effect is a fresh role picker message, so delete the old one.
 | `/setup` or `/test-reminder` missing for someone | They're only shown to members with **Manage Server**. |
 | Reminders post but nobody is notified | Run `/test-reminder`. It lists permission and role problems. You're only notified for roles you have, and not if the server's *Suppress All Role @mentions* setting is on. |
 | `No module named 'discord'` | Activate the venv (`.venv\Scripts\Activate.ps1`) before `python -m kqbot`, and run `pip install -r requirements.txt` once. |
+| `This bot isn't enabled in this server` | That server's ID isn't in `ALLOWED_GUILD_IDS`. Add it (comma-separated) and restart. |
 | `Another copy of the bot is already running` | The background task/service is already running it. Stop that first (see [docs/hosting.md](docs/hosting.md)), or use it instead of starting by hand. |
 | Bot isn't updating after a merge | Check `logs/supervisor.log`. It says why, e.g. the folder isn't on `main` or has hand-edited files. |
 | `needs Python 3.11 or newer` | Create the venv with a newer Python: `py -3.13 -m venv .venv`. |
