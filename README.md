@@ -39,7 +39,14 @@ Replies are only visible to the person who ran the command.
 
 ## Running it locally
 
-You need **Python 3.11 or newer**.
+You need **Python 3.11 or newer**. Check with `python --version`
+(Windows: `py --list` shows every installed version).
+
+> **Windows:** get it from <https://www.python.org/downloads/> and tick
+> **"Add python.exe to PATH"** in the installer. If an older Python is also
+> installed, create the virtual environment with the new one explicitly:
+> `py -3.13 -m venv .venv`. Once the venv is activated, plain `python` uses
+> the right version.
 
 1. Set up the bot in Discord and get a token: see
    [docs/discord-setup.md](docs/discord-setup.md).
