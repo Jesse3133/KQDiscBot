@@ -26,7 +26,7 @@ every player the times in their own time zone.
 | 3 | Auto-setup: roles, channels, reaction-role message | ✅ |
 | 4 | Reminders 3 min before, role pings, ✅/❌, auto-delete | ✅ |
 | 5 | Admin commands: `/event`, `/shift`, `/config` | ✅ |
-| 6 | Hosting + auto-deploy | in progress: Docker + CI done, host to pick ([docs/hosting.md](docs/hosting.md)) |
+| 6 | Hosting + auto-deploy (home PC / Raspberry Pi, CI) | ✅ |
 
 ## Commands
 
@@ -161,6 +161,13 @@ by ID.
 > role must be **above** the 5 event roles, or it can't give them out. Roles
 > the bot creates start out below it, so this only comes up if you move them.
 
+## Running it 24/7
+
+To keep the bot running on a Windows PC or Raspberry Pi, restarting and
+updating itself from GitHub's `main` branch, follow
+**[docs/hosting.md](docs/hosting.md)**. The steps below are for running it by
+hand, e.g. while testing.
+
 ## Running it locally
 
 You need **Python 3.11 or newer**. Check with `python --version`
@@ -219,6 +226,8 @@ The only side effect is a fresh role picker message, so delete the old one.
 | `/setup` or `/test-reminder` missing for someone | They're only shown to members with **Manage Server**. |
 | Reminders post but nobody is notified | Run `/test-reminder`. It lists permission and role problems. You're only notified for roles you have, and not if the server's *Suppress All Role @mentions* setting is on. |
 | `No module named 'discord'` | Activate the venv (`.venv\Scripts\Activate.ps1`) before `python -m kqbot`, and run `pip install -r requirements.txt` once. |
+| `Another copy of the bot is already running` | The background task/service is already running it. Stop that first (see [docs/hosting.md](docs/hosting.md)), or use it instead of starting by hand. |
+| Bot isn't updating after a merge | Check `logs/supervisor.log`. It says why, e.g. the folder isn't on `main` or has hand-edited files. |
 | `needs Python 3.11 or newer` | Create the venv with a newer Python: `py -3.13 -m venv .venv`. |
 
 ## Development
@@ -241,6 +250,8 @@ kqbot/
   events.py        the 5 Kingdom Quests and their default timing
   guild_setup.py   creates/repairs roles, channels, role picker message
   reminders.py     which reminders are due (timing only)
+  supervise.py     keeps the bot running and updates it (python -m kqbot.supervise)
+  instance_lock.py stops two copies running against one database
   schedule.py      "when does it start next?" math, incl. daylight saving
   formatting.py    message text
   cogs/
@@ -251,6 +262,7 @@ kqbot/
     common.py              shared helpers for commands
 tests/             unit tests (Discord is faked, no token needed)
 docs/              setup and hosting guides
+scripts/           install the bot as a Windows task or Linux service
 Dockerfile         container image (data in /data)
 docker-compose.yml run with Docker on your own machine
 .github/workflows/ CI: tests, lint and Docker build on every push

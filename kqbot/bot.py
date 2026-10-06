@@ -1,4 +1,8 @@
+import asyncio
 import logging
+import os
+import sys
+import threading
 import time
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -52,6 +56,8 @@ class KQBot(commands.Bot):
         self.shifts = self.db.load_shifts()
 
     async def setup_hook(self) -> None:
+        if os.environ.get("KQBOT_SUPERVISED") == "1" and sys.stdin is not None:
+            threading.Thread(target=self._stop_when_stdin_closes, daemon=True).start()
         for ext in EXTENSIONS:
             await self.load_extension(ext)
 
@@ -69,6 +75,16 @@ class KQBot(commands.Bot):
         log.info(
             "Logged in as %s (id %s) in %d server(s)", self.user, self.user.id, len(self.guilds)
         )
+
+    def _stop_when_stdin_closes(self) -> None:
+        """Shut down when the supervisor closes our stdin or exits.
+
+        That's how the supervisor stops the bot for an update. It also means
+        the bot never outlives a supervisor that was killed.
+        """
+        sys.stdin.buffer.read()
+        log.info("Supervisor asked the bot to stop (or exited); shutting down")
+        asyncio.run_coroutine_threadsafe(self.close(), self.loop)
 
     async def close(self) -> None:
         await super().close()

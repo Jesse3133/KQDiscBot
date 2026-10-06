@@ -20,3 +20,6 @@ venv/
 
 # Docker volume for the bot database
 data/
+
+# Supervisor logs
+logs/
