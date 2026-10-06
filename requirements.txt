@@ -1,0 +1,4 @@
+discord.py>=2.7,<3
+python-dotenv>=1.0
+# Time zone database; needed on Windows, harmless elsewhere.
+tzdata
