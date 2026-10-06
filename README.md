@@ -134,6 +134,17 @@ belong to the bot. Back it up if you move the bot to another computer. If
 it's lost, run `/setup`: the bot finds its roles and channels again by name.
 The only side effect is a fresh role picker message, so delete the old one.
 
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| A new command doesn't show up after updating | Check the startup log says `Synced N command(s)` with the right number, then reload Discord with **Ctrl+R** (desktop) or restart the app (mobile). Discord caches the command list. |
+| Commands take a long time to appear | Set `DEV_GUILD_ID` in `.env` so commands register to your server instantly. |
+| `/setup` or `/test-reminder` missing for someone | They're only shown to members with **Manage Server**. |
+| Reminders post but nobody is notified | Run `/test-reminder`. It lists permission and role problems. You're only notified for roles you have, and not if the server's *Suppress All Role @mentions* setting is on. |
+| `No module named 'discord'` | Activate the venv (`.venv\Scripts\Activate.ps1`) before `python -m kqbot`, and run `pip install -r requirements.txt` once. |
+| `needs Python 3.11 or newer` | Create the venv with a newer Python: `py -3.13 -m venv .venv`. |
+
 ## Development
 
 ```bash
